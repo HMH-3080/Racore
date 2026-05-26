@@ -1,6 +1,6 @@
 {
-  "name": "racore",
-  "version": "1.0.0",
+  "name": "Racore",
+  "version": "1.0.1",
   "description": "R'a Core standalone terminal AI coding assistant",
   "module": "src/index.tsx",
   "type": "module",
@@ -9,10 +9,10 @@
   "homepage": "https://www.npmjs.com/package/racore",
   "repository": {
     "type": "git",
-    "url": "https://github.com/racorexyz/racore.git"
+    "url": "https://github.com/loayabdalslam/Racore"
   },
   "bugs": {
-    "url": "https://github.com/racorexyz/racore/issues"
+    "url": "https://github.com/loayabdalslam/Racore/issues"
   },
   "keywords": [
     "cli",
