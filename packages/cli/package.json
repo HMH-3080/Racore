@@ -33,9 +33,9 @@
     "racore": "./bin/racore"
   },
   "scripts": {
-    "dev": "bun run --watch src/index.tsx",
-    "build": "bun build src/index.tsx --outdir dist --target bun",
-    "test": "bun test src/lib/*.test.ts",
+    "dev": "node ../../scripts/run-bun.mjs run --watch src/index.tsx",
+    "build": "node ../../scripts/run-bun.mjs build src/index.tsx --outdir dist --target bun",
+    "test": "node ../../scripts/run-bun.mjs test src/lib/*.test.ts",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {

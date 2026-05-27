@@ -165,7 +165,7 @@ export async function connectOpenRouter() {
     }
 
     const callbackUrl = `http://localhost:${port}/callback`;
-    const authorizeUrl = new URL("https://openrouter.ai/auth");
+    const authorizeUrl = new URL(`https://openrouter.ai/auth?callback_url=${callbackUrl}&code_challenge=${codeChallenge}&code_challenge_method=S256&state=${nonce}&key_label=racore`);
     authorizeUrl.searchParams.set("callback_url", callbackUrl);
     authorizeUrl.searchParams.set("code_challenge", codeChallenge);
     authorizeUrl.searchParams.set("code_challenge_method", "S256");
