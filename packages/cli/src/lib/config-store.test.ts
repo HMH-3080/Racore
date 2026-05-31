@@ -55,4 +55,18 @@ describe("config store", () => {
     expect(loaded.mode).toBe(Mode.ULTRA);
     expect(loaded.modelByProvider[ProviderId.OPENROUTER]).toBe("openai/gpt-5");
   });
+
+  it("falls back when the saved provider model is no longer available", () => {
+    saveConfig({
+      activeProvider: ProviderId.OPENROUTER,
+      mode: Mode.PLAN,
+      modelByProvider: {
+        ...getDefaultConfig().modelByProvider,
+        [ProviderId.OPENROUTER]: "missing/provider-model",
+      },
+    });
+
+    const loaded = loadConfig();
+    expect(loaded.modelByProvider[ProviderId.OPENROUTER]).toBe(getDefaultConfig().modelByProvider[ProviderId.OPENROUTER]);
+  });
 });

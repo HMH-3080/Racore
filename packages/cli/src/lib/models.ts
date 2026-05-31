@@ -23,7 +23,6 @@ export const BUILTIN_PROVIDER_MODELS: ProviderModel[] = [
     provider: ProviderId.OPENROUTER,
     label: "GPT-5 via OpenRouter",
     capability: "Broad routing and unified billing",
-    recommended: true,
   },
   {
     id: "anthropic/claude-sonnet-4",
@@ -118,6 +117,15 @@ export function getProviderModels(provider: ProviderIdType) {
 }
 
 export function getDefaultModel(provider: ProviderIdType) {
+  if (provider === ProviderId.OPENROUTER) {
+    const storedModels = loadStoredModelsState()[ProviderId.OPENROUTER] ?? [];
+    const freeStoredModel = storedModels.find((model) => model.id.endsWith(":free"));
+    if (freeStoredModel) return freeStoredModel;
+
+    const firstStoredModel = storedModels[0];
+    if (firstStoredModel) return firstStoredModel;
+  }
+
   const models = getProviderModels(provider);
   return models.find((model) => model.recommended) ?? models[0]!;
 }
@@ -126,6 +134,25 @@ export function getModelById(modelId: string) {
   return [...BUILTIN_PROVIDER_MODELS, ...Object.values(loadStoredModelsState()).flat()].find(
     (model) => model.id === modelId,
   );
+}
+
+export function toOpenRouterToolModels(
+  models: Array<{
+    id: string;
+    name?: string;
+    description?: string;
+    supported_parameters?: string[];
+  }>,
+) {
+  return models
+    .filter((item) => !!item.id && item.supported_parameters?.includes("tools"))
+    .map((item, index) => ({
+      id: item.id,
+      provider: ProviderId.OPENROUTER,
+      label: item.name?.trim() || item.id,
+      capability: item.description?.trim() || "OpenRouter available model",
+      recommended: index === 0 ? undefined : undefined,
+    } satisfies ProviderModel));
 }
 
 export async function refreshOpenRouterModels(apiKey: string) {
@@ -148,15 +175,7 @@ export async function refreshOpenRouterModels(apiKey: string) {
     }>;
   };
 
-  const fetchedModels = (payload.data ?? [])
-    .filter((item) => !!item.id)
-    .map((item, index) => ({
-      id: item.id,
-      provider: ProviderId.OPENROUTER,
-      label: item.name?.trim() || item.id,
-      capability: item.description?.trim() || "OpenRouter available model",
-      recommended: index === 0 ? undefined : undefined,
-    } satisfies ProviderModel));
+  const fetchedModels = toOpenRouterToolModels(payload.data ?? []);
 
   const currentState = loadStoredModelsState();
   currentState[ProviderId.OPENROUTER] = fetchedModels;

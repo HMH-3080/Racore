@@ -119,6 +119,11 @@ export function ProviderScreen() {
   const providerModel = getModelForProvider(provider);
   const authState = isProviderConnected(provider) ? "Connected" : "Not connected";
   const contentHeight = Math.max(10, Math.min(18, dimensions.height - 15));
+  const rowHeight = 4;
+  const centeredScrollTop = Math.max(
+    0,
+    selectedIndex * rowHeight - Math.floor(contentHeight / 2) + Math.ceil(rowHeight / 2),
+  );
 
   const actions: ProviderAction[] = [
     {
@@ -140,6 +145,7 @@ export function ProviderScreen() {
         setBusy(true);
         try {
           await connectProvider(provider);
+          setProvider(provider);
           toast.show({ variant: "success", message: `${definition.label} connected.` });
         } catch (error) {
           toast.show({
@@ -243,6 +249,7 @@ export function ProviderScreen() {
     <AppShell
       maxWidth={fontSize === "Small" ? 84 : fontSize === "Large" ? 70 : 76}
       contentHeight={contentHeight}
+      scrollTop={centeredScrollTop}
       footer={
         <box flexDirection="row" gap={3}>
           <text fg={colors.info} onMouseDown={() => navigate("/config")}>

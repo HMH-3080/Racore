@@ -1,4 +1,4 @@
-import { generateText, tool, type CoreMessage } from "ai";
+import { APICallError, generateText, tool, type CoreMessage } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import {
   Mode,
@@ -10,25 +10,27 @@ import {
   type ProviderIdType,
 } from "./app-schema";
 import { executeLocalTool } from "./local-tools";
+import { getProviderModels } from "./models";
 import { getProviderAuth } from "./provider-auth";
 
-function buildSystemPrompt(mode: ModeType) {
+function buildSystemPrompt(mode: ModeType, useTools: boolean) {
+  if (!useTools) {
+    return "You are R'a Core. Reply briefly and directly.";
+  }
+
   if (mode === Mode.PLAN) {
-    return "You are R'a Core, a planning-first coding assistant. In PLAN mode, inspect and reason carefully. Only use read-only tools.";
+    return "You are R'a Core in Plan mode. Inspect carefully. Use only read-only tools. Keep answers concise.";
   }
 
   if (mode === Mode.ULTRA) {
     return [
-      "You are R'a Core in Ultra Mode.",
-      "Ultra Mode is optimized for parallel execution, parallel tool calling, and delegated sub-analysis.",
-      "When useful, issue multiple independent tool calls in the same step.",
-      "Prefer batch tools such as readManyFiles, grepManyPatterns, and writeManyFiles when the task spans several files.",
-      "Use invokeAI for focused sub-analysis or decomposition when parallel reasoning would help.",
-      "Keep work coordinated and merge results back into one clear response.",
+      "You are R'a Core in Ultra mode.",
+      "Use parallel and batch tools when work spans files.",
+      "Keep results coordinated and concise.",
     ].join(" ");
   }
 
-  return "You are R'a Core, a coding assistant working inside the user's local project. Use tools when needed, prefer precise edits, and explain progress clearly.";
+  return "You are R'a Core, a local coding assistant. Use tools only when useful. Prefer precise edits and concise progress.";
 }
 
 function getModel(provider: ProviderIdType, modelId: string) {
@@ -79,6 +81,98 @@ function getModel(provider: ProviderIdType, modelId: string) {
   return openai(modelId);
 }
 
+function readProviderError(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+
+  const error = "error" in data ? data.error : data;
+  if (typeof error === "string") return error;
+  if (!error || typeof error !== "object") return null;
+
+  const message = "message" in error ? error.message : undefined;
+  const code = "code" in error ? error.code : undefined;
+  const metadata = "metadata" in error ? error.metadata : undefined;
+  const raw =
+    metadata && typeof metadata === "object" && "raw" in metadata
+      ? metadata.raw
+      : undefined;
+  const retryAfter =
+    metadata && typeof metadata === "object" && "retry_after_seconds" in metadata
+      ? metadata.retry_after_seconds
+      : undefined;
+
+  return [
+    typeof code === "string" || typeof code === "number" ? `${code}` : "",
+    typeof message === "string" ? message : "",
+    typeof raw === "string" ? raw : "",
+    typeof retryAfter === "number" ? `Retry after ${Math.ceil(retryAfter)}s.` : "",
+  ].filter(Boolean).join(": ") || null;
+}
+
+function parseProviderErrorBody(responseBody?: string): string | null {
+  if (!responseBody) return null;
+
+  try {
+    return readProviderError(JSON.parse(responseBody));
+  } catch {
+    return responseBody.length > 240 ? `${responseBody.slice(0, 240)}...` : responseBody;
+  }
+}
+
+function formatChatError(error: unknown, provider: ProviderIdType, model: string) {
+  if (APICallError.isInstance(error)) {
+    const providerMessage =
+      readProviderError(error.data) ?? parseProviderErrorBody(error.responseBody) ?? error.message;
+    const status = error.statusCode ? `HTTP ${error.statusCode}` : "provider error";
+    return new Error(`${provider} ${status} for ${model}: ${providerMessage}`);
+  }
+
+  if (error instanceof Error && APICallError.isInstance(error.cause)) {
+    return formatChatError(error.cause, provider, model);
+  }
+
+  if (error instanceof Error) return error;
+  return new Error(String(error));
+}
+
+function getApiCallError(error: unknown): APICallError | null {
+  if (APICallError.isInstance(error)) return error;
+  if (error instanceof Error && error.cause) return getApiCallError(error.cause);
+  return null;
+}
+
+function shouldTryOpenRouterFallback(error: unknown) {
+  const apiError = getApiCallError(error);
+  return apiError?.statusCode === 429 || (apiError?.statusCode != null && apiError.statusCode >= 500);
+}
+
+function getLatestUserText(messages: ChatMessage[]) {
+  const latest = [...messages].reverse().find((message) => message.role === "user");
+  return latest?.parts
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n")
+    .trim() ?? "";
+}
+
+function isCasualPrompt(text: string) {
+  const normalized = text.toLowerCase().trim();
+  if (normalized.length > 40) return false;
+
+  return /^(hi|hello|hey|yo|sup|thanks|thank you|ok|okay|i|test|ping|how are you)[.!? ]*$/.test(normalized);
+}
+
+function getOpenRouterCandidateModels(selectedModel: string) {
+  const models = getProviderModels(ProviderId.OPENROUTER).map((model) => model.id);
+  const selectedIsFree = selectedModel.endsWith(":free");
+  const fallbackModels = models.filter((modelId) =>
+    selectedIsFree ? modelId.endsWith(":free") : !modelId.endsWith(":free"),
+  );
+
+  return [...new Set([selectedModel, ...fallbackModels])]
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
 function toCoreMessages(messages: ChatMessage[]): CoreMessage[] {
   return messages.map((message) => ({
     role: message.role,
@@ -96,10 +190,31 @@ export async function submitChat(params: {
   model: string;
 }) {
   const startTime = Date.now();
-  const model = getModel(params.provider, params.model);
   const coreMessages = toCoreMessages(params.messages);
+  const latestUserText = getLatestUserText(params.messages);
+  const useTools = !isCasualPrompt(latestUserText);
+  const maxSteps = !useTools
+    ? 1
+    : params.mode === Mode.PLAN
+      ? 4
+      : params.mode === Mode.ULTRA
+        ? 10
+        : 6;
 
-  const tools = {
+  const modelIds =
+    params.provider === ProviderId.OPENROUTER
+      ? getOpenRouterCandidateModels(params.model)
+      : [params.model];
+
+  let usedModelId = params.model;
+  let result: Awaited<ReturnType<typeof generateText>> | null = null;
+  const errors: Error[] = [];
+
+  for (const modelId of modelIds) {
+    usedModelId = modelId;
+    const model = getModel(params.provider, modelId);
+
+    const tools = useTools ? {
     readFile: tool({
       inputSchema: toolInputSchemas.readFile,
       execute: async (input) => executeLocalTool("readFile", input, params.mode),
@@ -154,20 +269,42 @@ export async function submitChat(params: {
             },
           ],
           maxSteps: 2,
+          maxRetries: 0,
         });
 
         return { text: subtask.text };
       },
     }),
-  };
+    } : undefined;
 
-  const result = await generateText({
-    model,
-    system: buildSystemPrompt(params.mode),
-    messages: coreMessages,
-    tools,
-    maxSteps: params.mode === Mode.PLAN ? 6 : params.mode === Mode.ULTRA ? 14 : 10,
-  });
+    try {
+      result = await generateText({
+        model,
+        system: buildSystemPrompt(params.mode, useTools),
+        messages: coreMessages,
+        tools,
+        maxSteps,
+        maxRetries: 0,
+      });
+      break;
+    } catch (error) {
+      const formatted = formatChatError(error, params.provider, modelId);
+      errors.push(formatted);
+
+      if (params.provider !== ProviderId.OPENROUTER || !shouldTryOpenRouterFallback(error)) {
+        throw formatted;
+      }
+    }
+  }
+
+  if (!result) {
+    throw new Error(
+      [
+        "All OpenRouter fallback models failed.",
+        ...errors.map((error, index) => `${index + 1}. ${error.message}`),
+      ].join("\n"),
+    );
+  }
 
   const assistantParts: ChatMessage["parts"] = [];
 
@@ -200,7 +337,7 @@ export async function submitChat(params: {
   const metadata: MessageMetadata = {
     mode: params.mode,
     provider: params.provider,
-    model: params.model,
+    model: usedModelId,
     durationMs: Date.now() - startTime,
   };
 

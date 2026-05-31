@@ -12,6 +12,7 @@ import { useNavigate } from "react-router";
 import { EmptyBorder } from "./border";
 import { StatusBar } from "./status-bar";
 import { CommandMenu } from "./command-menu";
+import { COMMANDS } from "./command-menu/commands";
 import type { Command } from "./command-menu/types";
 import { useCommandMenu } from "./command-menu/use-command-menu";
 import { useToast } from "../providers/toast";
@@ -368,9 +369,47 @@ export function InputBar({ onSubmit, disabled = false }: Props) {
     const text = textarea.plainText.trim();
     if (text.length === 0) return;
 
+    if (text.startsWith("/")) {
+      const command = COMMANDS.find((item) => item.value === text || `/${item.name}` === text);
+      textarea.setText("");
+
+      if (!command?.action) {
+        toast.show({
+          variant: "error",
+          message: `Unknown command: ${text}. Type / to choose a command.`,
+        });
+        return;
+      }
+
+      command.action({
+        exit: () => renderer.destroy(),
+        toast,
+        dialog,
+        navigate,
+        mode,
+        provider,
+        setMode,
+        setProvider,
+        setModel,
+      });
+      return;
+    }
+
     onSubmit(text);
     textarea.setText("");
-  }, [disabled, onSubmit])
+  }, [
+    disabled,
+    onSubmit,
+    renderer,
+    toast,
+    dialog,
+    navigate,
+    mode,
+    provider,
+    setMode,
+    setProvider,
+    setModel,
+  ])
 
   const handleMentionExecute = useCallback((index: number) => {
     const textarea = textareaRef.current;

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { CONFIG_FILE, ensureAppDirectories } from "./app-paths";
 import { Mode, ProviderId, type AppConfig } from "./app-schema";
-import { getDefaultModel } from "./models";
+import { getDefaultModel, getProviderModels } from "./models";
 
 export function getDefaultConfig(): AppConfig {
   return {
@@ -20,22 +20,38 @@ export function getDefaultConfig(): AppConfig {
 export function loadConfig(): AppConfig {
   try {
     if (!existsSync(CONFIG_FILE)) {
-      return getDefaultConfig();
+      const defaults = getDefaultConfig();
+      saveConfig(defaults);
+      return defaults;
     }
 
     const parsed = JSON.parse(readFileSync(CONFIG_FILE, "utf8")) as Partial<AppConfig>;
     const defaults = getDefaultConfig();
 
-    return {
+    const modelByProvider = {
+      ...defaults.modelByProvider,
+      ...parsed.modelByProvider,
+    };
+
+    for (const provider of Object.values(ProviderId)) {
+      const availableModels = getProviderModels(provider);
+      if (!availableModels.some((model) => model.id === modelByProvider[provider])) {
+        modelByProvider[provider] = getDefaultModel(provider).id;
+      }
+    }
+
+    const config = {
       activeProvider: parsed.activeProvider ?? defaults.activeProvider,
-      modelByProvider: {
-        ...defaults.modelByProvider,
-        ...parsed.modelByProvider,
-      },
+      modelByProvider,
       mode: parsed.mode ?? defaults.mode,
     };
+
+    saveConfig(config);
+    return config;
   } catch {
-    return getDefaultConfig();
+    const defaults = getDefaultConfig();
+    saveConfig(defaults);
+    return defaults;
   }
 }
 
