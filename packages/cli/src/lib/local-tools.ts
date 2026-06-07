@@ -1,5 +1,5 @@
 import { mkdir, readFile, readdir, stat, writeFile } from "fs/promises";
-import { dirname, isAbsolute, join, relative, resolve } from "path";
+import { dirname, extname, isAbsolute, join, relative, resolve } from "path";
 import {
   formatAgentAccelerationContext,
   getAffectedTestsForPaths,
@@ -10,6 +10,13 @@ import {
   searchRepoSymbols,
 } from "./agent-accelerator";
 import { toolInputSchemas, Mode, type ModeType } from "./app-schema";
+
+const TEXT_EXTENSIONS = new Set([
+  ".cjs", ".cts", ".css", ".csv", ".env", ".go", ".graphql", ".html",
+  ".java", ".js", ".json", ".jsx", ".kt", ".md", ".mjs", ".mts",
+  ".php", ".py", ".rb", ".rs", ".scss", ".sh", ".sql", ".svelte",
+  ".swift", ".toml", ".ts", ".tsx", ".txt", ".vue", ".xml", ".yaml", ".yml",
+]);
 
 const MAX_FILE_SIZE = 10_000;
 const MAX_RESULTS = 200;
@@ -58,6 +65,10 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
   switch (toolName) {
     case "readFile": {
       const { path } = toolInputSchemas.readFile.parse(input);
+      const ext = extname(path).toLowerCase();
+      if (ext && !TEXT_EXTENSIONS.has(ext)) {
+        throw new Error(`Cannot read binary file: "${path}". Only text files are supported.`);
+      }
       const { resolved } = resolveInsideCwd(path);
       const content = await readFile(resolved, "utf-8");
       return content.length > MAX_FILE_SIZE
