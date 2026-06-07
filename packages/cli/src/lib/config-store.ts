@@ -3,6 +3,10 @@ import { CONFIG_FILE, ensureAppDirectories } from "./app-paths";
 import { Mode, ProviderId, type AppConfig } from "./app-schema";
 import { getDefaultModel, getProviderModels } from "./models";
 
+export function hasSavedConfig() {
+  return existsSync(CONFIG_FILE);
+}
+
 export function getDefaultConfig(): AppConfig {
   return {
     activeProvider: ProviderId.OPENAI,

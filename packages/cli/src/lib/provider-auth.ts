@@ -185,11 +185,11 @@ export async function connectOpenRouter() {
 }
 
 export async function connectOpenAI() {
-  void open("https://platform.openai.com/");
+  void open("https://platform.openai.com/api-keys");
   const envKey = process.env.OPENAI_API_KEY?.trim();
 
   if (!envKey) {
-    throw new Error("Set OPENAI_API_KEY in your environment or .env, then retry Connect.");
+    throw new Error("Opened OpenAI API keys. Set OPENAI_API_KEY or use Save API Key to finish login.");
   }
 
   saveProviderAuth(ProviderId.OPENAI, {

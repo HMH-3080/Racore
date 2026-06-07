@@ -9,22 +9,28 @@ import { ConfigScreen } from "./screens/config";
 import { ReleasesScreen } from "./screens/releases";
 import { OnboardingScreen } from "./screens/onboarding";
 import { ProviderScreen } from "./screens/provider-screen";
+import { hasSavedConfig } from "./lib/config-store";
 
-const router = createMemoryRouter([
+const router = createMemoryRouter(
+  [
+    {
+      path: "/",
+      element: <RootLayout />,
+      children: [
+        { index: true, element: <Home /> },
+        { path: "config", element: <ConfigScreen /> },
+        { path: "config/provider/:providerId", element: <ProviderScreen /> },
+        { path: "releases", element: <ReleasesScreen /> },
+        { path: "onboarding", element: <OnboardingScreen /> },
+        { path: "sessions/new", element: <NewSession /> },
+        { path: "sessions/:id", element: <Session /> },
+      ],
+    },
+  ],
   {
-    path: "/",
-    element: <RootLayout />,
-    children: [
-      { index: true, element: <Home /> },
-      { path: "config", element: <ConfigScreen /> },
-      { path: "config/provider/:providerId", element: <ProviderScreen /> },
-      { path: "releases", element: <ReleasesScreen /> },
-      { path: "onboarding", element: <OnboardingScreen /> },
-      { path: "sessions/new", element: <NewSession /> },
-      { path: "sessions/:id", element: <Session /> },
-    ]
-  }
-]);
+    initialEntries: [hasSavedConfig() ? "/" : "/onboarding"],
+  },
+);
 
 function App() {
   return <RouterProvider router={router} />
