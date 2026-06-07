@@ -10,6 +10,8 @@ import { ReleasesScreen } from "./screens/releases";
 import { OnboardingScreen } from "./screens/onboarding";
 import { ProviderScreen } from "./screens/provider-screen";
 import { hasSavedConfig } from "./lib/config-store";
+import { isProviderConnected } from "./lib/provider-auth";
+import { ProviderId } from "./lib/app-schema";
 
 const router = createMemoryRouter(
   [
@@ -28,7 +30,7 @@ const router = createMemoryRouter(
     },
   ],
   {
-    initialEntries: [hasSavedConfig() ? "/" : "/onboarding"],
+    initialEntries: [hasSavedConfig() && isProviderConnected(ProviderId.OPENROUTER) ? "/" : "/onboarding"],
   },
 );
 
