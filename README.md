@@ -7,6 +7,7 @@
 [![Runtime](https://img.shields.io/badge/Runtime-Bun-%23f9f1d5)](https://bun.sh)
 
 ---
+<img width="1912" height="975" alt="image" src="https://github.com/user-attachments/assets/df665be5-3315-40d6-93bd-822ead7e13fe" />
 
 ## Features
 
