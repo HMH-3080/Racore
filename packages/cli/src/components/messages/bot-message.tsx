@@ -5,6 +5,7 @@ import { Mode, type ModeType } from "../../lib/app-schema";
 import { useTheme } from "../../providers/theme";
 import { EmptyBorder } from "../border";
 import { MarkdownText } from "./markdown-text";
+import { RTLText } from "../rtl-text";
 
 type ClientMessagePart = Message["parts"][number];
 type ToolPart = Extract<ClientMessagePart, { type: `tool-${string}` }>;
@@ -81,9 +82,9 @@ export function BotMessage({ parts, model, mode, durationMs, streaming = false }
                   width="100%"
                   paddingX={2}
                 >
-                  <text attributes={TextAttributes.DIM}>
+                  <RTLText attributes={TextAttributes.DIM}>
                     <em fg={colors.thinking}>Thinking:</em> {part.text}
-                  </text>
+                  </RTLText>
                 </box>
               );
             }
@@ -103,10 +104,10 @@ export function BotMessage({ parts, model, mode, durationMs, streaming = false }
                   width="100%"
                   paddingX={2}
                 >
-                  <text attributes={TextAttributes.DIM}>
+                  <RTLText attributes={TextAttributes.DIM}>
                     <em fg={colors.info}>{formatToolName(toolName)}:</em> {formatToolArgs(part)}
                     {part.state === "output-error" ? ` ${part.errorText}` : ""}
-                  </text>
+                  </RTLText>
                 </box>
               );
             }

@@ -1,5 +1,6 @@
 import { TextAttributes } from "@opentui/core";
 import { useTheme } from "../../providers/theme";
+import { RTLText } from "../rtl-text";
 
 type MarkdownSegment = {
   type: "text" | "bold" | "italic" | "inlineCode" | "codeBlock" | "header" | "listItem" | "hr" | "newline";
@@ -92,15 +93,15 @@ function renderSegment(segment: MarkdownSegment, colors: Record<string, string>,
   switch (segment.type) {
     case "header":
       return (
-        <text key={`seg-${index}`} attributes={TextAttributes.BOLD}>
+        <RTLText key={`seg-${index}`} attributes={TextAttributes.BOLD}>
           {segment.text}
-        </text>
+        </RTLText>
       );
     case "bold":
       return (
-        <text key={`seg-${index}`} attributes={TextAttributes.BOLD}>
+        <RTLText key={`seg-${index}`} attributes={TextAttributes.BOLD}>
           {segment.text}
-        </text>
+        </RTLText>
       );
     case "italic":
       return (
@@ -108,35 +109,35 @@ function renderSegment(segment: MarkdownSegment, colors: Record<string, string>,
       );
     case "inlineCode":
       return (
-        <text key={`seg-${index}`} fg={colors.primary}>
+        <RTLText key={`seg-${index}`} fg={colors.primary}>
           {segment.text}
-        </text>
+        </RTLText>
       );
     case "codeBlock":
       return (
         <box key={`seg-${index}`} border={["left"]} borderColor={colors.dimSeparator} paddingX={2} width="100%">
-          <text fg={colors.info} attributes={TextAttributes.DIM}>
+          <RTLText fg={colors.info} attributes={TextAttributes.DIM}>
             {segment.text}
-          </text>
+          </RTLText>
         </box>
       );
     case "listItem":
       return (
         <box key={`seg-${index}`} flexDirection="row" gap={1} paddingLeft={1}>
-          <text>•</text>
-          <text>{segment.text}</text>
+          <RTLText>{"\u2022"}</RTLText>
+          <RTLText>{segment.text}</RTLText>
         </box>
       );
     case "hr":
       return (
-        <text key={`seg-${index}`} fg={colors.dimSeparator}>
+        <RTLText key={`seg-${index}`} fg={colors.dimSeparator}>
           {"\u2500".repeat(40)}
-        </text>
+        </RTLText>
       );
     case "newline":
-      return <text key={`seg-${index}`}>{" "}</text>;
+      return <RTLText key={`seg-${index}`}>{" "}</RTLText>;
     default:
-      return <text key={`seg-${index}`}>{segment.text}</text>;
+      return <RTLText key={`seg-${index}`}>{segment.text}</RTLText>;
   }
 }
 

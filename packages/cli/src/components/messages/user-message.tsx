@@ -1,6 +1,7 @@
 import { Mode, type ModeType } from "../../lib/app-schema";
 import { EmptyBorder } from "../border";
 import { useTheme } from "../../providers/theme";
+import { RTLText } from "../rtl-text";
 
 type Props = {
   message: string;
@@ -35,7 +36,7 @@ export function UserMessage({ message, mode }: Props) {
           backgroundColor={colors.surface}
           width="100%"
         >
-          <text>{message}</text>
+          <RTLText>{message}</RTLText>
         </box>
       </box>
     </box>
