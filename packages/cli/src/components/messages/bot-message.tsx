@@ -2,8 +2,10 @@ import prettyMs from "pretty-ms";
 import { TextAttributes } from "@opentui/core";
 import type { Message } from "../../hooks/use-chat";
 import { Mode, type ModeType } from "../../lib/app-schema";
+import type { DiffLine } from "../../lib/diff-utils";
 import { useTheme } from "../../providers/theme";
 import { EmptyBorder } from "../border";
+import { DiffView } from "../diff-view";
 import { MarkdownText } from "./markdown-text";
 import { RTLText } from "../rtl-text";
 
@@ -91,23 +93,35 @@ export function BotMessage({ parts, model, mode, durationMs, streaming = false }
 
             if (isToolPart(part)) {
               const toolName = part.type.slice("tool-".length);
+              const isFileOp = toolName === "writeFile" || toolName === "editFile" || toolName === "patchFile";
+              const output = part.output as { diff?: DiffLine[]; path?: string } | undefined;
+              const hasDiff = isFileOp && output?.diff && output.diff.length > 0;
 
               return (
                 <box
                   key={part.toolCallId}
                   border={["left"]}
-                  borderColor={colors.thinkingBorder}
+                  borderColor={hasDiff ? colors.focus : colors.thinkingBorder}
                   customBorderChars={{
                     ...EmptyBorder,
                     vertical: "│",
                   }}
                   width="100%"
                   paddingX={2}
+                  flexDirection="column"
                 >
-                  <RTLText attributes={TextAttributes.DIM}>
-                    <em fg={colors.info}>{formatToolName(toolName)}:</em> {formatToolArgs(part)}
-                    {part.state === "output-error" ? ` ${part.errorText}` : ""}
-                  </RTLText>
+                  <box paddingBottom={hasDiff ? 1 : 0}>
+                    <RTLText attributes={TextAttributes.DIM}>
+                      <em fg={colors.info}>{formatToolName(toolName)}:</em> {formatToolArgs(part)}
+                      {part.state === "output-error" ? ` ${part.errorText}` : ""}
+                    </RTLText>
+                  </box>
+                  {hasDiff ? (
+                    <DiffView
+                      filePath={output!.path!}
+                      diff={output!.diff!}
+                    />
+                  ) : null}
                 </box>
               );
             }

@@ -10,6 +10,16 @@ import {
   searchRepoSymbols,
 } from "./agent-accelerator";
 import { toolInputSchemas, Mode, type ModeType } from "./app-schema";
+import { computeDiff } from "./diff-utils";
+import { addActivity, updateActivity } from "./file-activity-store";
+
+async function tryReadFile(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, "utf-8");
+  } catch {
+    return null;
+  }
+}
 
 const TEXT_EXTENSIONS = new Set([
   ".cjs", ".cts", ".css", ".csv", ".env", ".go", ".graphql", ".html",
@@ -218,12 +228,17 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
     case "writeFile": {
       const { path, content } = toolInputSchemas.writeFile.parse(input);
       const { cwd, resolved } = resolveInsideCwd(path);
+      const oldContent = await tryReadFile(resolved);
       await mkdir(dirname(resolved), { recursive: true });
       await writeFile(resolved, content, "utf-8");
+      const diff = computeDiff(oldContent ?? "", content);
+      const actId = addActivity(relative(cwd, resolved), "write");
+      updateActivity(actId, { status: "completed", diff, content });
       return {
         success: true as const,
         path: relative(cwd, resolved),
         bytesWritten: Buffer.byteLength(content, "utf-8"),
+        diff,
       };
     }
     case "writeManyFiles": {
@@ -242,13 +257,18 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
       if (occurrences === 0) throw new Error("oldString not found in file");
       if (occurrences > 1) throw new Error(`oldString is ambiguous; found ${occurrences} matches`);
 
-      await writeFile(resolved, content.replace(oldString, newString), "utf-8");
-      return { success: true as const, path: relative(cwd, resolved) };
+      const newContent = content.replace(oldString, newString);
+      await writeFile(resolved, newContent, "utf-8");
+      const diff = computeDiff(content, newContent);
+      const actId = addActivity(relative(cwd, resolved), "edit");
+      updateActivity(actId, { status: "completed", diff, content: newContent });
+      return { success: true as const, path: relative(cwd, resolved), diff };
     }
     case "patchFile": {
       const { path, patches } = toolInputSchemas.patchFile.parse(input);
       const { cwd, resolved } = resolveInsideCwd(path);
-      let content = await readFile(resolved, "utf-8");
+      const originalContent = await readFile(resolved, "utf-8");
+      let content = originalContent;
 
       for (const patch of patches) {
         if (patch.action === "append") {
@@ -276,10 +296,14 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
       }
 
       await writeFile(resolved, content, "utf-8");
+      const diff = computeDiff(originalContent, content);
+      const actId = addActivity(relative(cwd, resolved), "patch");
+      updateActivity(actId, { status: "completed", diff, content });
       return {
         success: true as const,
         path: relative(cwd, resolved),
         patchesApplied: patches.length,
+        diff,
       };
     }
     case "bash": {
