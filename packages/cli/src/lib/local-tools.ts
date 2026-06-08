@@ -303,6 +303,27 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
         exitCode,
       };
     }
+    case "updateTodoList": {
+      const { updates } = toolInputSchemas.updateTodoList.parse(input);
+      const { addTodo, updateTodoStatus, getTodos } = await import("./todo-store");
+      const results: Array<{ id: string; title: string; status: string }> = [];
+      for (const update of updates) {
+        if (update.id) {
+          updateTodoStatus(update.id, update.status);
+          results.push({ id: update.id, title: update.title, status: update.status });
+        } else {
+          const item = addTodo(update.title);
+          if (update.status !== "pending") updateTodoStatus(item.id, update.status);
+          results.push({ id: item.id, title: item.title, status: item.status });
+        }
+      }
+      return { todos: results };
+    }
+    case "getTodoList": {
+      toolInputSchemas.getTodoList.parse(input);
+      const { getTodos } = await import("./todo-store");
+      return { todos: getTodos().map((t) => ({ id: t.id, title: t.title, status: t.status })) };
+    }
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }

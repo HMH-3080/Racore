@@ -25,11 +25,18 @@ function buildSystemPrompt(mode: ModeType, useTools: boolean, accelerationContex
     return "You are R'a Core. Reply briefly and directly.";
   }
 
-  const speedProtocol = [
+const speedProtocol = [
     "Speed protocol:",
     "Use the fast workspace context before broad exploration.",
     "Prefer readManyFiles, grepManyPatterns, affectedTests, and patchFile for compact parallel progress.",
     "Run focused verification before wider commands when tests are inferred.",
+  ].join(" ");
+
+  const todoProtocol = [
+    "Todo tracking:",
+    "Use updateTodoList to create a todo item for each task you need to complete.",
+    "As you complete each task, call updateTodoList to mark it as completed.",
+    "Use getTodoList to review outstanding tasks before starting new work.",
   ].join(" ");
 
   const context = accelerationContext
@@ -40,6 +47,7 @@ function buildSystemPrompt(mode: ModeType, useTools: boolean, accelerationContex
     return [
       "You are R'a Core in Plan mode. Inspect carefully. Use only read-only tools. Keep answers concise.",
       speedProtocol,
+      todoProtocol,
     ].join(" ") + context;
   }
 
@@ -51,12 +59,14 @@ function buildSystemPrompt(mode: ModeType, useTools: boolean, accelerationContex
       "Route small subtasks to invokeAI only when they can run independently.",
       "Keep results coordinated and concise.",
       speedProtocol,
+      todoProtocol,
     ].join(" ") + context;
   }
 
   return [
     "You are R'a Core, a local coding assistant. Use tools only when useful. Prefer precise edits and concise progress.",
     speedProtocol,
+    todoProtocol,
   ].join(" ") + context;
 }
 
@@ -435,6 +445,14 @@ export async function submitChat(params: {
       execute: async (input) => executeLocalTool("rememberProjectFact", input, params.mode),
       }),
     } : {}),
+    updateTodoList: tool({
+      inputSchema: toolInputSchemas.updateTodoList,
+      execute: async (input) => executeLocalTool("updateTodoList", input, params.mode),
+    }),
+    getTodoList: tool({
+      inputSchema: toolInputSchemas.getTodoList,
+      execute: async (input) => executeLocalTool("getTodoList", input, params.mode),
+    }),
     readFile: tool({
       inputSchema: toolInputSchemas.readFile,
       execute: async (input) => executeLocalTool("readFile", input, params.mode),

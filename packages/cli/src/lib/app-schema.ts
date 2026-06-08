@@ -115,6 +115,14 @@ export const toolInputSchemas = {
     task: z.string().describe("A focused subtask for a parallel AI pass"),
     context: z.string().optional().describe("Optional extra context for the subtask"),
   }),
+  updateTodoList: z.object({
+    updates: z.array(z.object({
+      id: z.string().optional().describe("Todo ID to update (omit to create new)"),
+      title: z.string().describe("Title or description of the todo item"),
+      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).default("pending").describe("New status"),
+    })).describe("List of todo items to create or update"),
+  }),
+  getTodoList: z.object({}).describe("Get the current todo list"),
 } as const;
 
 export type MessageMetadata = {

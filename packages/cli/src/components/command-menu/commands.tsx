@@ -105,6 +105,14 @@ export const COMMANDS: Command[] = [
     },
   },
   {
+    name: "usage",
+    description: "View token usage, cost, and session statistics",
+    value: "/usage",
+    action: (ctx) => {
+      ctx.navigate("/usage");
+    },
+  },
+  {
     name: "exit",
     description: "Quit the application",
     value: "/exit",

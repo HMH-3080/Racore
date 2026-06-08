@@ -4,6 +4,7 @@ import { TextAttributes } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import { InputBar } from "../components/input-bar";
 import { BotMessage, ErrorMessage, UserMessage } from "../components/messages";
+import { TodoPanel } from "../components/todo-panel";
 import { Spinner } from "../components/spinner";
 import { useChat, type Message } from "../hooks/use-chat";
 import { type ModeType, type SessionRecord } from "../lib/app-schema";
@@ -11,6 +12,7 @@ import { usePromptConfig } from "../providers/prompt-config";
 import { useTheme } from "../providers/theme";
 import { useKeyboardLayer } from "../providers/keyboard-layer";
 import { createSession, listSessions } from "../lib/session-store";
+import { autoCreateTodos } from "../lib/todo-store";
 
 function shortTitle(title: string) {
   return title.length > 24 ? `${title.slice(0, 21)}...` : title;
@@ -100,6 +102,7 @@ export function Home() {
 
   const handleSubmit = useCallback(
     (text: string) => {
+      autoCreateTodos(text);
       if (activeSession && submitHandlerRef.current) {
         submitHandlerRef.current(text);
         setSessionVersion((version) => version + 1);
@@ -257,23 +260,20 @@ export function Home() {
         height="100%"
         flexDirection="column"
         alignItems="center"
-        justifyContent="space-between"
+        overflow="hidden"
         paddingX={4}
         paddingY={2}
-        overflow="hidden"
       >
-        {activeSession ? (
-          <InlineChat
-            key={activeSession.id}
-            session={activeSession}
-            initialPrompt={initialPrompt}
-            onSubmit={setInlineSubmitHandler}
-          />
-        ) : (
-          <>
-            <box height={1} />
-
-            <box flexDirection="column" alignItems="center" gap={1}>
+        <box flexGrow={1} width="100%" maxWidth={78} flexDirection="column" minHeight={0} overflow="hidden">
+          {activeSession ? (
+            <InlineChat
+              key={activeSession.id}
+              session={activeSession}
+              initialPrompt={initialPrompt}
+              onSubmit={setInlineSubmitHandler}
+            />
+          ) : (
+            <box flexDirection="column" alignItems="center" justifyContent="center" flexGrow={1} gap={1}>
               <ascii-font font="tiny" text="R'a Core" />
               <text attributes={TextAttributes.DIM}>Your standalone coding agent</text>
               <box flexDirection="row" gap={1} marginTop={1}>
@@ -284,12 +284,10 @@ export function Home() {
                 <text>{model}</text>
               </box>
             </box>
+          )}
+        </box>
 
-            <box height={1} />
-          </>
-        )}
-
-        <box width="100%" maxWidth={78} flexDirection="column" gap={1}>
+        <box width="100%" maxWidth={78} flexDirection="column" gap={1} flexShrink={0}>
           <InputBar onSubmit={handleSubmit} active={focusArea === "chat"} />
           <box flexDirection="row" justifyContent="space-between" width="100%" paddingX={1}>
             <box flexDirection="row" gap={2}>
@@ -307,6 +305,8 @@ export function Home() {
           </box>
         </box>
       </box>
+
+      {activeSession ? <TodoPanel /> : null}
     </box>
   );
 };

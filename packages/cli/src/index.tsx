@@ -9,6 +9,7 @@ import { ConfigScreen } from "./screens/config";
 import { ReleasesScreen } from "./screens/releases";
 import { OnboardingScreen } from "./screens/onboarding";
 import { ProviderScreen } from "./screens/provider-screen";
+import { UsageScreen } from "./screens/usage";
 import { hasSavedConfig } from "./lib/config-store";
 
 const router = createMemoryRouter(
@@ -21,6 +22,7 @@ const router = createMemoryRouter(
         { path: "config", element: <ConfigScreen /> },
         { path: "config/provider/:providerId", element: <ProviderScreen /> },
         { path: "releases", element: <ReleasesScreen /> },
+        { path: "usage", element: <UsageScreen /> },
         { path: "onboarding", element: <OnboardingScreen /> },
         { path: "sessions/new", element: <NewSession /> },
         { path: "sessions/:id", element: <Session /> },
