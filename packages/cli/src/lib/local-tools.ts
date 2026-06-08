@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, stat, writeFile } from "fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile, access } from "fs/promises";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "path";
 import {
   formatAgentAccelerationContext,
@@ -18,6 +18,15 @@ async function tryReadFile(path: string): Promise<string | null> {
     return await readFile(path, "utf-8");
   } catch {
     return null;
+  }
+}
+
+async function tryStat(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -233,7 +242,17 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
       updateActivity(actId, { status: "in_progress" });
       try {
         const oldContent = await tryReadFile(resolved);
-        await mkdir(dirname(resolved), { recursive: true });
+        const parentDir = dirname(resolved);
+        const dirExisted = await tryStat(parentDir);
+        await mkdir(parentDir, { recursive: true });
+        const dirsCreated: string[] = [];
+        if (!dirExisted) {
+          let dir = parentDir;
+          while (dir !== cwd && !(await tryStat(dir))) {
+            dirsCreated.push(relative(cwd, dir));
+            dir = dirname(dir);
+          }
+        }
         await writeFile(resolved, content, "utf-8");
         const diff = computeDiff(oldContent ?? "", content);
         updateActivity(actId, { status: "completed", diff, content });
@@ -242,6 +261,7 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
           path: relPath,
           bytesWritten: Buffer.byteLength(content, "utf-8"),
           diff,
+          dirsCreated: dirsCreated.length > 0 ? dirsCreated.reverse() : undefined,
         };
       } catch (error) {
         updateActivity(actId, { status: "error", error: String(error) });

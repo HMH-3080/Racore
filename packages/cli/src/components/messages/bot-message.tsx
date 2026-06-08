@@ -94,42 +94,47 @@ export function BotMessage({ parts, model, mode, durationMs, streaming = false }
             if (isToolPart(part)) {
               const toolName = part.type.slice("tool-".length);
               const isFileOp = toolName === "writeFile" || toolName === "editFile" || toolName === "patchFile";
-              const output = part.output as { diff?: DiffLine[]; path?: string } | undefined;
+              const output = part.output as { diff?: DiffLine[]; path?: string; dirsCreated?: string[] } | undefined;
               const hasDiff = isFileOp && output?.diff && output.diff.length > 0;
               const isRunning = part.state === "input-available" || part.state === undefined;
 
               return (
                 <box
                   key={part.toolCallId}
-                  border={["left"]}
-                  borderColor={isRunning ? colors.info : hasDiff ? colors.focus : colors.thinkingBorder}
-                  customBorderChars={{
-                    ...EmptyBorder,
-                    vertical: "│",
-                  }}
+                  gap={0}
                   width="100%"
-                  paddingX={2}
                   flexDirection="column"
                 >
-                  <box paddingBottom={hasDiff || isRunning ? 1 : 0}>
-                    <RTLText attributes={TextAttributes.DIM}>
-                      {isRunning ? <text fg={colors.info}>⏳ </text> : null}
-                      <em fg={colors.info}>{formatToolName(toolName)}:</em> {formatToolArgs(part)}
-                      {part.state === "output-error" ? ` ${part.errorText}` : ""}
-                      {isRunning ? <text attributes={TextAttributes.DIM}> running...</text> : null}
-                    </RTLText>
+                  <box
+                    border={["left"]}
+                    borderColor={isRunning ? colors.info : hasDiff ? colors.focus : colors.thinkingBorder}
+                    customBorderChars={{ ...EmptyBorder, vertical: "│" }}
+                    width="100%"
+                    paddingX={2}
+                    flexDirection="column"
+                    gap={0}
+                  >
+                    <box paddingBottom={hasDiff || isRunning ? 1 : 0}>
+                      <RTLText attributes={TextAttributes.DIM}>
+                        {isRunning ? <text fg={colors.info}>⏳ </text> : null}
+                        <em fg={colors.info}>{formatToolName(toolName)}:</em> {formatToolArgs(part)}
+                        {part.state === "output-error" ? ` ${part.errorText}` : ""}
+                        {isRunning ? <text attributes={TextAttributes.DIM}> running...</text> : null}
+                      </RTLText>
+                    </box>
+                    {hasDiff ? (
+                      <DiffView
+                        filePath={output!.path!}
+                        diff={output!.diff!}
+                        dirsCreated={output!.dirsCreated}
+                      />
+                    ) : null}
+                    {isRunning && isFileOp ? (
+                      <RTLText attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
+                        waiting for output...
+                      </RTLText>
+                    ) : null}
                   </box>
-                  {hasDiff ? (
-                    <DiffView
-                      filePath={output!.path!}
-                      diff={output!.diff!}
-                    />
-                  ) : null}
-                  {isRunning && isFileOp ? (
-                    <RTLText attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
-                      waiting for output...
-                    </RTLText>
-                  ) : null}
                 </box>
               );
             }

@@ -35,9 +35,13 @@ const speedProtocol = [
 
   const todoProtocol = [
     "Todo tracking:",
-    "Use updateTodoList to create a todo item for each task you need to complete.",
-    "As you complete each task, call updateTodoList to mark it as completed.",
-    "Use getTodoList to review outstanding tasks before starting new work.",
+    "YOUR FIRST ACTION: Decompose the user's request into a list of specific, actionable todos using updateTodoList.",
+    "Keep each todo focused on one deliverable (one file, one command, one verification).",
+    "After creating todos, work through them one at a time.",
+    "Before each step, call getTodoList to see what's left.",
+    "As you start work on a todo, call updateTodoList to mark it as in_progress.",
+    "Once its deliverable is done, mark it as completed with a one-line result summary.",
+    "Periodically call getTodoList to ensure no todos were missed or left stuck.",
   ].join(" ");
 
   const context = accelerationContext

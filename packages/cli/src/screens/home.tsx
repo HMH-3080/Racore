@@ -5,7 +5,7 @@ import { useKeyboard } from "@opentui/react";
 import { InputBar } from "../components/input-bar";
 import { BotMessage, ErrorMessage, UserMessage } from "../components/messages";
 import { TodoPanel } from "../components/todo-panel";
-import { FileActivityPanel } from "../components/file-activity-panel";
+
 import { Spinner } from "../components/spinner";
 import { useChat, type Message } from "../hooks/use-chat";
 import { type ModeType, type SessionRecord } from "../lib/app-schema";
@@ -14,8 +14,6 @@ import { useTheme } from "../providers/theme";
 import { useKeyboardLayer } from "../providers/keyboard-layer";
 import { createSession, listSessions } from "../lib/session-store";
 import { addTodo } from "../lib/todo-store";
-import { decomposeTask } from "../lib/task-planner";
-import { executeAllTasks } from "../lib/task-executor";
 
 function shortTitle(title: string) {
   return title.length > 24 ? `${title.slice(0, 21)}...` : title;
@@ -106,20 +104,6 @@ export function Home() {
   const handleSubmit = useCallback(
     async (text: string) => {
       addTodo(text.length > 80 ? text.slice(0, 77) + "..." : text);
-
-      if (text.length > 150) {
-        try {
-          const subTasks = await decomposeTask(text);
-          const subTaskIds: string[] = [];
-          for (const task of subTasks) {
-            const item = addTodo(task.title);
-            subTaskIds.push(item.id);
-          }
-          executeAllTasks({ model, taskIds: subTaskIds }).catch(() => {});
-        } catch {
-          // decomposition is optional; continue normally
-        }
-      }
 
       if (activeSession && submitHandlerRef.current) {
         submitHandlerRef.current(text);
@@ -325,7 +309,6 @@ export function Home() {
       </box>
 
       {activeSession ? <TodoPanel /> : null}
-      {activeSession ? <FileActivityPanel /> : null}
     </box>
   );
 };
