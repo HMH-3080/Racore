@@ -674,9 +674,25 @@ export async function submitChat(params: {
   };
 
   const toolCallCount = steps.reduce((sum, step) => sum + (step.toolCalls?.length ?? 0), 0);
-  const totalTokens = steps.reduce((sum, step) => sum + (step.usage?.totalTokens ?? 0), 0);
-  const inputTokens = steps.reduce((sum, step) => sum + (step.usage?.promptTokens ?? 0), 0);
-  const outputTokens = steps.reduce((sum, step) => sum + (step.usage?.completionTokens ?? 0), 0);
+  const totalTextLength = steps.reduce((sum, step) => sum + (step.text?.length ?? 0), 0);
+
+  let totalTokens = steps.reduce((sum, step) => {
+    const u = step.usage as Record<string, number> | undefined;
+    return sum + (u?.totalTokens ?? u?.total_tokens ?? 0);
+  }, 0);
+  let inputTokens = steps.reduce((sum, step) => {
+    const u = step.usage as Record<string, number> | undefined;
+    return sum + (u?.promptTokens ?? u?.prompt_tokens ?? 0);
+  }, 0);
+  let outputTokens = steps.reduce((sum, step) => {
+    const u = step.usage as Record<string, number> | undefined;
+    return sum + (u?.completionTokens ?? u?.completion_tokens ?? u?.outputTokens ?? u?.output_tokens ?? 0);
+  }, 0);
+
+  if (totalTokens === 0 && totalTextLength > 0) {
+    outputTokens = Math.max(outputTokens, Math.ceil(totalTextLength / 4));
+    totalTokens = inputTokens + outputTokens;
+  }
 
   recordUsage({
     model: usedModelId,

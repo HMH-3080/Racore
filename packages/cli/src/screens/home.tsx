@@ -12,7 +12,7 @@ import { usePromptConfig } from "../providers/prompt-config";
 import { useTheme } from "../providers/theme";
 import { useKeyboardLayer } from "../providers/keyboard-layer";
 import { createSession, listSessions } from "../lib/session-store";
-import { autoCreateTodos } from "../lib/todo-store";
+import { addTodo } from "../lib/todo-store";
 
 function shortTitle(title: string) {
   return title.length > 24 ? `${title.slice(0, 21)}...` : title;
@@ -102,7 +102,7 @@ export function Home() {
 
   const handleSubmit = useCallback(
     (text: string) => {
-      autoCreateTodos(text);
+      addTodo(text.length > 80 ? text.slice(0, 77) + "..." : text);
       if (activeSession && submitHandlerRef.current) {
         submitHandlerRef.current(text);
         setSessionVersion((version) => version + 1);

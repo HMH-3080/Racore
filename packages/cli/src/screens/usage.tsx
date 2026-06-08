@@ -1,8 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { CenteredPage } from "../components/centered-page";
 import { APP_NAME } from "../lib/app-info";
-import { getUsageSnapshot, clearUsage } from "../lib/usage-store";
+import { getUsageSnapshot, clearUsage, subscribe } from "../lib/usage-store";
 import { useTheme } from "../providers/theme";
 import prettyMs from "pretty-ms";
 
@@ -11,6 +11,11 @@ export function UsageScreen() {
   const { colors } = useTheme();
   const [refresh, setRefresh] = useState(0);
   const stats = getUsageSnapshot();
+
+  useEffect(() => {
+    const unsub = subscribe(() => setRefresh((v) => v + 1));
+    return unsub;
+  }, []);
 
   const handleClear = useCallback(() => {
     clearUsage();

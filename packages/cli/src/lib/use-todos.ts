@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { subscribe, getTodos, addTodo, updateTodoStatus, clearTodos, autoCreateTodos, cancelTodo, type TodoItem, type TodoStatus } from "./todo-store";
+import { useState, useEffect } from "react";
+import { subscribe, getTodos, addTodo, updateTodoStatus, clearTodos, cancelTodo, addTodos, type TodoItem, type TodoStatus } from "./todo-store";
 
 export function useTodos() {
   const [todos, setTodos] = useState<TodoItem[]>(() => getTodos());
@@ -12,9 +13,9 @@ export function useTodos() {
   return {
     todos,
     addTodo,
+    addTodos,
     updateTodoStatus,
     cancelTodo,
     clearTodos,
-    autoCreateTodos,
   };
 }

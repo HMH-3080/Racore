@@ -5,6 +5,10 @@ export type TodoItem = {
   title: string;
   description?: string;
   status: TodoStatus;
+  error?: string;
+  result?: string;
+  parentId?: string;
+  order: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -13,11 +17,30 @@ type Listener = (todos: TodoItem[]) => void;
 
 let todos: TodoItem[] = [];
 let listeners: Listener[] = [];
+let batchDepth = 0;
+let pendingNotify = false;
 
 function notify() {
+  if (batchDepth > 0) {
+    pendingNotify = true;
+    return;
+  }
   const snapshot = [...todos];
   for (const listener of listeners) {
     listener(snapshot);
+  }
+}
+
+export function batchUpdate<T>(fn: () => T): T {
+  batchDepth++;
+  try {
+    return fn();
+  } finally {
+    batchDepth--;
+    if (batchDepth === 0 && pendingNotify) {
+      pendingNotify = false;
+      notify();
+    }
   }
 }
 
@@ -32,12 +55,23 @@ export function getTodos(): TodoItem[] {
   return [...todos];
 }
 
-export function addTodo(title: string, description?: string): TodoItem {
+export function getPendingTodos(): TodoItem[] {
+  return todos.filter((t) => t.status === "pending").sort((a, b) => a.order - b.order);
+}
+
+export function getInProgressTodos(): TodoItem[] {
+  return todos.filter((t) => t.status === "in_progress");
+}
+
+export function addTodo(title: string, description?: string, parentId?: string): TodoItem {
+  const order = todos.length > 0 ? Math.max(...todos.map((t) => t.order)) + 1 : 0;
   const item: TodoItem = {
     id: crypto.randomUUID(),
     title,
     description,
     status: "pending",
+    order,
+    parentId,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -46,20 +80,30 @@ export function addTodo(title: string, description?: string): TodoItem {
   return item;
 }
 
-export function updateTodoStatus(id: string, status: TodoStatus) {
+export function addTodos(items: Array<{ title: string; description?: string }>): TodoItem[] {
+  return batchUpdate(() => items.map((item) => addTodo(item.title, item.description)));
+}
+
+export function updateTodoStatus(id: string, status: TodoStatus, extra?: { error?: string; result?: string }) {
   const item = todos.find((t) => t.id === id);
   if (!item) return;
   item.status = status;
   item.updatedAt = new Date();
+  if (extra?.error) item.error = extra.error;
+  if (extra?.result) item.result = extra.result;
   notify();
+}
+
+export function setTodoError(id: string, error: string) {
+  updateTodoStatus(id, "cancelled", { error });
+}
+
+export function completeTodoWithResult(id: string, result: string) {
+  updateTodoStatus(id, "completed", { result });
 }
 
 export function cancelTodo(id: string) {
   updateTodoStatus(id, "cancelled");
-}
-
-export function completeTodo(id: string) {
-  updateTodoStatus(id, "completed");
 }
 
 export function removeTodo(id: string) {
@@ -72,19 +116,11 @@ export function clearTodos() {
   notify();
 }
 
-export function autoCreateTodos(text: string) {
-  const lines = text.split("\n");
-  let count = 0;
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (/^[-*]\s+/.test(trimmed) || /^\d+[.)]\s+/.test(trimmed)) {
-      addTodo(trimmed.replace(/^[-*\d+.)\s]+/, "").trim());
-      count++;
-    }
-  }
-  if (count === 0 && text.length > 10) {
-    addTodo(text.length > 80 ? text.slice(0, 77) + "..." : text);
-    count++;
-  }
-  return count;
+export function getTodoStats() {
+  const total = todos.length;
+  const pending = todos.filter((t) => t.status === "pending").length;
+  const inProgress = todos.filter((t) => t.status === "in_progress").length;
+  const completed = todos.filter((t) => t.status === "completed").length;
+  const cancelled = todos.filter((t) => t.status === "cancelled").length;
+  return { total, pending, inProgress, completed, cancelled };
 }
