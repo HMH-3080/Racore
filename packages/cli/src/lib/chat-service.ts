@@ -194,37 +194,19 @@ function isCasualPrompt(text: string) {
   return /^(hi|hello|hey|yo|sup|thanks|thank you|ok|okay|i|test|ping|how are you)[.!? ]*$/.test(normalized);
 }
 
-function getOpenRouterCandidateModels(selectedModel: string) {
-  const models = getProviderModels(ProviderId.OPENROUTER).map((model) => model.id);
-  const selectedIsFree = selectedModel.endsWith(":free");
-  const fallbackModels = models.filter((modelId) =>
-    selectedIsFree ? modelId.endsWith(":free") : !modelId.endsWith(":free"),
-  );
+function getOpenRouterCandidateModels(selectedModel: string): string[] {
+  const modelPrefix = selectedModel.split("/")[0];
+  if (!modelPrefix) return [selectedModel].filter(Boolean);
 
-  return [...new Set([selectedModel, ...fallbackModels])]
-    .filter(Boolean)
-    .slice(0, 3);
+  const models = getProviderModels(ProviderId.OPENROUTER).map((m) => m.id);
+  const sameFamily = models.filter((id) => id.startsWith(modelPrefix + "/") || id === selectedModel);
+
+  const candidates = [...new Set([selectedModel, ...sameFamily])].filter(Boolean);
+  return candidates.slice(0, 3);
 }
 
-function shouldUseFastModel(mode: ModeType, text: string) {
-  if (mode !== Mode.BUILD) return false;
-
-  const normalized = text.toLowerCase();
-  const heavyIntent = /\b(architecture|database|migration|security|auth|refactor|entire|whole|complex|ultra|deep|plan)\b/.test(
-    normalized,
-  );
-
-  return !heavyIntent && text.length < 1_500;
-}
-
-function getRoutedOpenRouterCandidateModels(selectedModel: string, mode: ModeType, text: string) {
-  const baseCandidates = getOpenRouterCandidateModels(selectedModel);
-  if (!shouldUseFastModel(mode, text)) return baseCandidates;
-
-  const available = new Set(getProviderModels(ProviderId.OPENROUTER).map((model) => model.id));
-  const fastCandidates = FAST_OPENROUTER_MODELS.filter((modelId) => available.has(modelId) || !modelId.endsWith(":free"));
-
-  return [...new Set([...baseCandidates, ...fastCandidates])].slice(0, 4);
+function getRoutedOpenRouterCandidateModels(selectedModel: string, _mode: ModeType, _text: string): string[] {
+  return getOpenRouterCandidateModels(selectedModel);
 }
 
 function toModelMessages(messages: ChatMessage[]): ModelMessage[] {
@@ -680,21 +662,26 @@ export async function submitChat(params: {
   const toolCallCount = steps.reduce((sum, step) => sum + (step.toolCalls?.length ?? 0), 0);
   const totalTextLength = steps.reduce((sum, step) => sum + (step.text?.length ?? 0), 0);
 
-  let totalTokens = steps.reduce((sum, step) => {
+  let totalTokens = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  for (const step of steps) {
     const u = step.usage as Record<string, number> | undefined;
-    return sum + (u?.totalTokens ?? u?.total_tokens ?? 0);
-  }, 0);
-  let inputTokens = steps.reduce((sum, step) => {
-    const u = step.usage as Record<string, number> | undefined;
-    return sum + (u?.promptTokens ?? u?.prompt_tokens ?? 0);
-  }, 0);
-  let outputTokens = steps.reduce((sum, step) => {
-    const u = step.usage as Record<string, number> | undefined;
-    return sum + (u?.completionTokens ?? u?.completion_tokens ?? u?.outputTokens ?? u?.output_tokens ?? 0);
-  }, 0);
+    totalTokens += u?.totalTokens ?? u?.total_tokens ?? 0;
+    inputTokens += u?.promptTokens ?? u?.prompt_tokens ?? 0;
+    outputTokens += u?.completionTokens ?? u?.completion_tokens ?? u?.outputTokens ?? u?.output_tokens ?? 0;
+  }
 
   if (totalTokens === 0 && totalTextLength > 0) {
-    outputTokens = Math.max(outputTokens, Math.ceil(totalTextLength / 4));
+    const estimated = Math.ceil(totalTextLength / 4);
+    outputTokens = estimated;
+    inputTokens = Math.round(estimated * 2.5);
+    totalTokens = inputTokens + outputTokens;
+  }
+
+  if (inputTokens === 0 && outputTokens > 0) {
+    inputTokens = Math.round(outputTokens * 2);
     totalTokens = inputTokens + outputTokens;
   }
 
