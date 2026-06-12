@@ -1,0 +1,61 @@
+image: oven/bun:1.2
+
+stages:
+  - verify
+
+cache:
+  key:
+    files:
+      - package-lock.json
+  paths:
+    - node_modules/
+    - packages/cli/node_modules/
+
+install_deps:
+  stage: verify
+  script:
+    - bun install
+  artifacts:
+    paths:
+      - node_modules/
+      - packages/cli/node_modules/
+    expire_in: 1 hour
+
+test:
+  stage: verify
+  needs: [install_deps]
+  script:
+    - cd packages/cli
+    - bun test ./src/lib
+
+typecheck:
+  stage: verify
+  needs: [install_deps]
+  allow_failure: true
+  script:
+    - cd packages/cli
+    - bun x tsc --noEmit --pretty false
+
+# Agent evals: scripted end-to-end tasks run through headless mode.
+# Requires a provider key; runs manually to avoid burning tokens on every push.
+evals:
+  stage: verify
+  needs: [install_deps]
+  rules:
+    - if: $OPENROUTER_API_KEY
+      when: manual
+      allow_failure: true
+  script:
+    - cd packages/cli
+    - node evals/run-evals.mjs
+
+build:
+  stage: verify
+  needs: [install_deps]
+  script:
+    - cd packages/cli
+    - bun build src/index.tsx src/headless.ts --outdir dist --target bun
+  artifacts:
+    paths:
+      - packages/cli/dist/
+    expire_in: 1 week

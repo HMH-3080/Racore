@@ -28,12 +28,12 @@ describe("config store", () => {
     restoreConfigFile();
   });
 
-  it("returns an OpenRouter-only default config", () => {
+  it("returns a default config covering every provider", () => {
     const config = getDefaultConfig();
 
     expect(config.activeProvider).toBe(ProviderId.OPENROUTER);
     expect(config.mode).toBe(Mode.BUILD);
-    expect(Object.keys(config.modelByProvider)).toEqual([ProviderId.OPENROUTER]);
+    expect(Object.keys(config.modelByProvider).sort()).toEqual(Object.values(ProviderId).sort());
   });
 
   it("round-trips a saved config", () => {

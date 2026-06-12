@@ -6,6 +6,7 @@ import { ThemeProvider } from "../providers/theme";
 import { ThemedRoot } from "./themed-root";
 import { PromptConfigProvider } from "../providers/prompt-config";
 import { UpdateNotifier } from "../components/update-notifier";
+import { ApprovalGate } from "../components/approval-gate";
 
 export function RootLayout() {
   return (
@@ -16,6 +17,7 @@ export function RootLayout() {
             <PromptConfigProvider>
               <ThemedRoot>
                 <UpdateNotifier />
+                <ApprovalGate />
                 <Outlet />
               </ThemedRoot>
             </PromptConfigProvider>

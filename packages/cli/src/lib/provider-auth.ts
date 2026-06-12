@@ -4,22 +4,37 @@ import { AUTH_FILE, ensureAppDirectories } from "./app-paths";
 import { ProviderId, type AuthState, type ProviderAuthState, type ProviderIdType } from "./app-schema";
 import { refreshOpenRouterModels } from "./models";
 
-const EMPTY_AUTH_STATE: AuthState = {
-  [ProviderId.OPENROUTER]: {},
+function createEmptyAuthState(): AuthState {
+  const state = {} as AuthState;
+  for (const provider of Object.values(ProviderId)) {
+    state[provider] = {};
+  }
+  return state;
+}
+
+const PROVIDER_ENV_VARS: Record<ProviderIdType, string> = {
+  [ProviderId.OPENROUTER]: "OPENROUTER_API_KEY",
+  [ProviderId.OPENAI]: "OPENAI_API_KEY",
+  [ProviderId.ANTHROPIC]: "ANTHROPIC_API_KEY",
+  [ProviderId.GEMINI]: "GEMINI_API_KEY",
+  [ProviderId.OLLAMA]: "OLLAMA_API_KEY",
 };
 
 function loadAuthState(): AuthState {
   try {
     if (!existsSync(AUTH_FILE)) {
-      return EMPTY_AUTH_STATE;
+      return createEmptyAuthState();
     }
 
     const parsed = JSON.parse(readFileSync(AUTH_FILE, "utf8")) as Partial<AuthState>;
     return {
-      [ProviderId.OPENROUTER]: parsed.openrouter ?? {},
+      ...createEmptyAuthState(),
+      ...Object.fromEntries(
+        Object.values(ProviderId).map((provider) => [provider, parsed[provider] ?? {}]),
+      ),
     };
   } catch {
-    return EMPTY_AUTH_STATE;
+    return createEmptyAuthState();
   }
 }
 
@@ -29,7 +44,21 @@ function saveAuthState(state: AuthState) {
 }
 
 export function getProviderAuth(provider: ProviderIdType): ProviderAuthState {
-  return loadAuthState()[provider] ?? {};
+  const stored = loadAuthState()[provider] ?? {};
+  if (stored.apiKey) return stored;
+
+  // Fall back to environment variables so CI and scripts work without setup.
+  const envKey = process.env[PROVIDER_ENV_VARS[provider]];
+  if (envKey) {
+    return { apiKey: envKey, authType: "api-key" };
+  }
+
+  // Ollama runs locally and needs no real key; "ollama" is a placeholder.
+  if (provider === ProviderId.OLLAMA) {
+    return { apiKey: "ollama", authType: "api-key" };
+  }
+
+  return stored;
 }
 
 export function isProviderConnected(provider: ProviderIdType) {
@@ -192,6 +221,11 @@ export async function connectOpenRouter() {
   });
 }
 
-export async function connectProvider(_provider: ProviderIdType) {
-  return connectOpenRouter();
+export async function connectProvider(provider: ProviderIdType) {
+  if (provider === ProviderId.OPENROUTER) {
+    return connectOpenRouter();
+  }
+  throw new Error(
+    `${provider} does not support OAuth. Paste an API key instead, or set the ${PROVIDER_ENV_VARS[provider]} environment variable.`,
+  );
 }

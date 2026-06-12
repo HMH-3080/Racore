@@ -8,13 +8,23 @@ export const Mode = {
 
 export const ProviderId = {
   OPENROUTER: "openrouter",
+  OPENAI: "openai",
+  ANTHROPIC: "anthropic",
+  GEMINI: "gemini",
+  OLLAMA: "ollama",
 } as const;
 
 export type ModeType = (typeof Mode)[keyof typeof Mode];
 export type ProviderIdType = (typeof ProviderId)[keyof typeof ProviderId];
 
 export const modeSchema = z.enum([Mode.BUILD, Mode.PLAN, Mode.ULTRA]);
-export const providerIdSchema = z.enum([ProviderId.OPENROUTER]);
+export const providerIdSchema = z.enum([
+  ProviderId.OPENROUTER,
+  ProviderId.OPENAI,
+  ProviderId.ANTHROPIC,
+  ProviderId.GEMINI,
+  ProviderId.OLLAMA,
+]);
 
 export type ProviderModel = {
   id: string;
@@ -123,6 +133,42 @@ export const toolInputSchemas = {
     })).describe("List of todo items to create or update"),
   }),
   getTodoList: z.object({}).describe("Get the current todo list"),
+  gitStatus: z.object({}).describe("Get the current git branch and working tree status"),
+  gitDiff: z.object({
+    staged: z.boolean().optional().describe("Show staged changes instead of unstaged"),
+    path: z.string().optional().describe("Limit the diff to a specific path"),
+  }),
+  gitLog: z.object({
+    limit: z.number().optional().describe("Number of recent commits to show (default 10, max 50)"),
+  }),
+  gitCommit: z.object({
+    message: z.string().describe("Commit message"),
+    paths: z.array(z.string()).optional().describe("Specific paths to stage and commit"),
+    stageAll: z.boolean().optional().describe("Stage all changes before committing"),
+  }),
+  webFetch: z.object({
+    url: z.string().describe("Public http(s) URL to fetch (docs, READMEs, changelogs)"),
+    maxBytes: z.number().optional().describe("Maximum content bytes to return"),
+  }),
+  verifyChanges: z.object({
+    paths: z.array(z.string()).optional().describe("Changed file paths to focus lint on"),
+  }).describe("Run typecheck and lint to verify recent edits; call after making changes"),
+  listCheckpoints: z.object({
+    limit: z.number().optional().describe("Maximum checkpoints to list"),
+  }).describe("List restore points captured before agent edits"),
+  restoreCheckpoint: z.object({
+    id: z.string().optional().describe("Checkpoint ID to restore (omit for the most recent)"),
+  }).describe("Undo agent edits by restoring files from a checkpoint"),
+  listSkills: z.object({}).describe("List reusable skills available for this project and user"),
+  useSkill: z.object({
+    name: z.string().describe("Name of the skill to load"),
+  }).describe("Load a skill's full instructions to apply to the current task"),
+  createSkill: z.object({
+    name: z.string().describe("Short skill name, e.g. 'deploy-frontend'"),
+    description: z.string().describe("One-line description of when to use this skill"),
+    triggers: z.string().optional().describe("Comma-separated keywords that should activate the skill"),
+    content: z.string().describe("Markdown instructions: the reusable procedure, commands, and pitfalls"),
+  }).describe("Save a new reusable skill after solving a novel, repeatable problem"),
 } as const;
 
 export type MessageMetadata = {

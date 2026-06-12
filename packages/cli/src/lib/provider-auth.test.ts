@@ -48,11 +48,12 @@ describe("provider auth", () => {
     expect(getProviderAuth(ProviderId.OPENROUTER).apiKey).toBeUndefined();
   });
 
-  it("persists valid OpenRouter-only auth json", () => {
+  it("persists auth json with an entry for every provider", () => {
     saveProviderApiKey(ProviderId.OPENROUTER, "or-key");
     const raw = readFileSync(AUTH_FILE, "utf8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
 
-    expect(Object.keys(parsed)).toEqual([ProviderId.OPENROUTER]);
+    expect(Object.keys(parsed).sort()).toEqual(Object.values(ProviderId).sort());
+    expect((parsed[ProviderId.OPENROUTER] as { apiKey?: string }).apiKey).toBe("or-key");
   });
 });

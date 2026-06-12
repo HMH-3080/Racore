@@ -8,11 +8,14 @@ export function hasSavedConfig() {
 }
 
 export function getDefaultConfig(): AppConfig {
+  const modelByProvider = {} as AppConfig["modelByProvider"];
+  for (const provider of Object.values(ProviderId)) {
+    modelByProvider[provider] = getDefaultModel(provider).id;
+  }
+
   return {
     activeProvider: ProviderId.OPENROUTER,
-    modelByProvider: {
-      [ProviderId.OPENROUTER]: getDefaultModel(ProviderId.OPENROUTER).id,
-    },
+    modelByProvider,
     mode: Mode.BUILD,
   };
 }
@@ -28,10 +31,11 @@ export function loadConfig(): AppConfig {
     const parsed = JSON.parse(readFileSync(CONFIG_FILE, "utf8")) as Partial<AppConfig>;
     const defaults = getDefaultConfig();
 
-    const modelByProvider = {
-      [ProviderId.OPENROUTER]:
-        parsed.modelByProvider?.[ProviderId.OPENROUTER] ?? defaults.modelByProvider[ProviderId.OPENROUTER],
-    };
+    const modelByProvider = {} as AppConfig["modelByProvider"];
+    for (const provider of Object.values(ProviderId)) {
+      modelByProvider[provider] =
+        parsed.modelByProvider?.[provider] ?? defaults.modelByProvider[provider];
+    }
 
     for (const provider of Object.values(ProviderId)) {
       const availableModels = getProviderModels(provider);
@@ -40,8 +44,12 @@ export function loadConfig(): AppConfig {
       }
     }
 
+    const isValidProvider =
+      parsed.activeProvider != null
+      && Object.values(ProviderId).includes(parsed.activeProvider);
+
     const config = {
-      activeProvider: defaults.activeProvider,
+      activeProvider: isValidProvider ? parsed.activeProvider! : defaults.activeProvider,
       modelByProvider,
       mode: parsed.mode ?? defaults.mode,
     };

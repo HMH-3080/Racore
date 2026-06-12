@@ -11,7 +11,16 @@ import {
 } from "./agent-accelerator";
 import { toolInputSchemas, Mode, type ModeType } from "./app-schema";
 import { computeDiff } from "./diff-utils";
+import { reportAgentActivity } from "./agent-activity-store";
 import { addActivity, updateActivity } from "./file-activity-store";
+import { beginCheckpoint, listCheckpoints, restoreCheckpoint, snapshotBeforeWrite } from "./checkpoint-store";
+import { runPostWriteHook } from "./custom-commands";
+import { gitCommit, gitDiff, gitLog, gitStatus } from "./git-tools";
+import { createGitignoreFilter } from "./gitignore";
+import { checkBashPermission, checkWritePermission } from "./permissions";
+import { getShellArgv } from "./shell";
+import { verifyChanges } from "./verify";
+import { webFetch } from "./web-tools";
 
 async function tryReadFile(path: string): Promise<string | null> {
   try {
@@ -61,7 +70,7 @@ function truncate(value: string, limit: number) {
     : value;
 }
 
-export async function executeLocalTool(toolName: string, input: unknown, mode: ModeType) {
+export async function executeLocalTool(toolName: string, input: unknown, mode: ModeType): Promise<unknown> {
   if (
     mode === Mode.PLAN
     && ![
@@ -76,10 +85,20 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
       "searchSymbols",
       "affectedTests",
       "readProjectMemory",
+      "gitStatus",
+      "gitDiff",
+      "gitLog",
+      "webFetch",
+      "listCheckpoints",
+      "listSkills",
+      "useSkill",
     ].includes(toolName)
   ) {
     throw new Error(`Tool ${toolName} is not available in PLAN mode`);
   }
+
+  // Surface live progress in the status line while tools execute.
+  reportAgentActivity("tool", toolName);
 
   switch (toolName) {
     case "readFile": {
@@ -97,11 +116,13 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
     case "listDirectory": {
       const { path } = toolInputSchemas.listDirectory.parse(input);
       const { cwd, resolved } = resolveInsideCwd(path);
+      const isIgnored = createGitignoreFilter(cwd);
       const entries = await readdir(resolved);
       const results: { name: string; type: "file" | "directory" }[] = [];
 
       for (const entry of entries) {
         if (entry.startsWith(".") || entry === "node_modules") continue;
+        if (isIgnored(relative(cwd, join(resolved, entry)))) continue;
         const info = await stat(join(resolved, entry));
         results.push({ name: entry, type: info.isDirectory() ? "directory" : "file" });
       }
@@ -114,12 +135,14 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
     case "glob": {
       const { pattern, path } = toolInputSchemas.glob.parse(input);
       const { cwd, resolved } = resolveInsideCwd(path);
+      const isIgnored = createGitignoreFilter(cwd);
       const glob = new Bun.Glob(pattern);
       const files: string[] = [];
       let truncated = false;
 
       for await (const match of glob.scan({ cwd: resolved, dot: false, onlyFiles: true })) {
         if (match.includes("node_modules")) continue;
+        if (isIgnored(relative(cwd, resolve(resolved, match)))) continue;
         if (files.length >= MAX_RESULTS) {
           truncated = true;
           break;
@@ -241,7 +264,10 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
       const actId = addActivity(relPath, "write");
       updateActivity(actId, { status: "in_progress" });
       try {
+        const writeDecision = await checkWritePermission(relPath);
+        if (!writeDecision.allowed) throw new Error(writeDecision.reason);
         const oldContent = await tryReadFile(resolved);
+        await snapshotBeforeWrite(relPath, oldContent);
         const parentDir = dirname(resolved);
         const dirExisted = await tryStat(parentDir);
         await mkdir(parentDir, { recursive: true });
@@ -254,6 +280,7 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
           }
         }
         await writeFile(resolved, content, "utf-8");
+        void runPostWriteHook(relPath);
         const diff = computeDiff(oldContent ?? "", content);
         updateActivity(actId, { status: "completed", diff, content });
         return {
@@ -282,7 +309,10 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
       const actId = addActivity(relPath, "edit");
       updateActivity(actId, { status: "in_progress" });
       try {
+        const editDecision = await checkWritePermission(relPath);
+        if (!editDecision.allowed) throw new Error(editDecision.reason);
         const content = await readFile(resolved, "utf-8");
+        await snapshotBeforeWrite(relPath, content);
         const occurrences = content.split(oldString).length - 1;
 
         if (occurrences === 0) {
@@ -296,6 +326,7 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
 
         const newContent = content.replace(oldString, newString);
         await writeFile(resolved, newContent, "utf-8");
+        void runPostWriteHook(relPath);
         const diff = computeDiff(content, newContent);
         updateActivity(actId, { status: "completed", diff, content: newContent });
         return { success: true as const, path: relPath, diff };
@@ -313,7 +344,10 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
       const actId = addActivity(relPath, "patch");
       updateActivity(actId, { status: "in_progress" });
       try {
+        const patchDecision = await checkWritePermission(relPath);
+        if (!patchDecision.allowed) throw new Error(patchDecision.reason);
         const originalContent = await readFile(resolved, "utf-8");
+        await snapshotBeforeWrite(relPath, originalContent);
         let content = originalContent;
 
       for (const patch of patches) {
@@ -342,6 +376,7 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
       }
 
       await writeFile(resolved, content, "utf-8");
+      void runPostWriteHook(relPath);
       const diff = computeDiff(originalContent, content);
       updateActivity(actId, { status: "completed", diff, content });
       return {
@@ -357,7 +392,11 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
     }
     case "bash": {
       const { command, timeout = DEFAULT_TIMEOUT } = toolInputSchemas.bash.parse(input);
-      const proc = Bun.spawn(["bash", "-c", command], {
+      const decision = await checkBashPermission(command);
+      if (!decision.allowed) {
+        return { stdout: "", stderr: decision.reason, exitCode: 126, blocked: true as const };
+      }
+      const proc = Bun.spawn(getShellArgv(command), {
         cwd: resolveInsideCwd(".").resolved,
         stdout: "pipe",
         stderr: "pipe",
@@ -396,6 +435,72 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
       toolInputSchemas.getTodoList.parse(input);
       const { getTodos } = await import("./todo-store");
       return { todos: getTodos().map((t) => ({ id: t.id, title: t.title, status: t.status })) };
+    }
+    case "gitStatus": {
+      toolInputSchemas.gitStatus.parse(input);
+      return await gitStatus();
+    }
+    case "gitDiff": {
+      const { staged, path } = toolInputSchemas.gitDiff.parse(input);
+      return await gitDiff({ staged, path });
+    }
+    case "gitLog": {
+      const { limit } = toolInputSchemas.gitLog.parse(input);
+      return await gitLog({ limit });
+    }
+    case "gitCommit": {
+      const { message, paths, stageAll } = toolInputSchemas.gitCommit.parse(input);
+      return await gitCommit({ message, paths, stageAll });
+    }
+    case "webFetch": {
+      const { url, maxBytes } = toolInputSchemas.webFetch.parse(input);
+      return await webFetch({ url, maxBytes });
+    }
+    case "verifyChanges": {
+      const { paths } = toolInputSchemas.verifyChanges.parse(input);
+      return await verifyChanges(paths);
+    }
+    case "listCheckpoints": {
+      const { limit } = toolInputSchemas.listCheckpoints.parse(input);
+      return {
+        checkpoints: listCheckpoints(limit).map((checkpoint) => ({
+          id: checkpoint.id,
+          label: checkpoint.label,
+          createdAt: checkpoint.createdAt,
+          files: checkpoint.entries.map((entry) => entry.path),
+        })),
+      };
+    }
+    case "restoreCheckpoint": {
+      const { id } = toolInputSchemas.restoreCheckpoint.parse(input);
+      return await restoreCheckpoint(id);
+    }
+    case "listSkills": {
+      toolInputSchemas.listSkills.parse(input);
+      const { listSkills } = await import("./skills");
+      return {
+        skills: listSkills().map((skill) => ({
+          name: skill.name,
+          description: skill.description,
+          triggers: skill.triggers,
+          scope: skill.scope,
+        })),
+      };
+    }
+    case "useSkill": {
+      const { name } = toolInputSchemas.useSkill.parse(input);
+      const { getSkill } = await import("./skills");
+      const skill = getSkill(name);
+      if (!skill) {
+        throw new Error(`Skill "${name}" not found. Call listSkills to see available skills.`);
+      }
+      return { name: skill.name, description: skill.description, content: skill.content };
+    }
+    case "createSkill": {
+      const parsed = toolInputSchemas.createSkill.parse(input);
+      const { createSkill } = await import("./skills");
+      const skill = createSkill(parsed);
+      return { success: true as const, name: skill.name, path: relative(process.cwd(), skill.path) };
     }
     default:
       throw new Error(`Unknown tool: ${toolName}`);

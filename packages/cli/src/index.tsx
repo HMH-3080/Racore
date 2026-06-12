@@ -11,6 +11,19 @@ import { OnboardingScreen } from "./screens/onboarding";
 import { ProviderScreen } from "./screens/provider-screen";
 import { UsageScreen } from "./screens/usage";
 import { hasSavedConfig } from "./lib/config-store";
+import { listSessions } from "./lib/session-store";
+
+function getInitialEntry(): string {
+  if (!hasSavedConfig()) return "/onboarding";
+
+  // --resume / --continue: jump straight back into the most recent session.
+  if (process.env["RACORE_CONTINUE"] === "1") {
+    const latest = listSessions()[0];
+    if (latest) return `/sessions/${latest.id}`;
+  }
+
+  return "/";
+}
 
 const router = createMemoryRouter(
   [
@@ -30,7 +43,7 @@ const router = createMemoryRouter(
     },
   ],
   {
-    initialEntries: [hasSavedConfig() ? "/" : "/onboarding"],
+    initialEntries: [getInitialEntry()],
   },
 );
 

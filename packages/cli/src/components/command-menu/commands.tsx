@@ -1,5 +1,6 @@
 import { getProviderModels } from "../../lib/models";
 import { performSelfUpdate } from "../../lib/self-update";
+import { emitSessionAction } from "../../lib/session-actions";
 import {
   AgentsDialogContent,
   ModelsDialogContent,
@@ -102,6 +103,15 @@ export const COMMANDS: Command[] = [
         title: "Select Theme",
         children: <ThemeDialogContent />,
       });
+    },
+  },
+  {
+    name: "compact",
+    description: "Compact the current conversation to free context window",
+    value: "/compact",
+    action: (ctx) => {
+      emitSessionAction("compact");
+      ctx.toast.show({ variant: "success", message: "Conversation context compacted" });
     },
   },
   {

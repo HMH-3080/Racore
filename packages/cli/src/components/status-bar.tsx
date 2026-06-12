@@ -1,6 +1,13 @@
+import { useEffect, useState } from "react";
 import { TextAttributes } from "@opentui/core";
 import { CLI_VERSION } from "../lib/app-info";
 import { Mode } from "../lib/app-schema";
+import {
+  formatTokenCount,
+  getContextUsage,
+  subscribeContextUsage,
+  type ContextUsage,
+} from "../lib/context-usage-store";
 import { getModeLabel } from "./dialogs/agents-dialog";
 import { usePromptConfig } from "../providers/prompt-config";
 import { useTheme } from "../providers/theme";
@@ -8,6 +15,9 @@ import { useTheme } from "../providers/theme";
 export function StatusBar() {
   const { mode, model, provider } = usePromptConfig();
   const { colors } = useTheme();
+  const [contextUsage, setContextUsage] = useState<ContextUsage>(() => getContextUsage());
+
+  useEffect(() => subscribeContextUsage(setContextUsage), []);
   const modeLabel = getModeLabel(mode);
   const modeColor =
     mode === Mode.PLAN ? colors.planMode : mode === Mode.ULTRA ? colors.info : colors.primary;
@@ -21,6 +31,14 @@ export function StatusBar() {
       <text>{model}</text>
       <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>{">"}</text>
       <text attributes={TextAttributes.DIM}>v{CLI_VERSION}</text>
+      {contextUsage.estimatedTokens > 0 ? (
+        <>
+          <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>{">"}</text>
+          <text attributes={TextAttributes.DIM}>
+            {formatTokenCount(contextUsage.estimatedTokens)} ctx{contextUsage.compacted ? " (compacted)" : ""}
+          </text>
+        </>
+      ) : null}
     </box>
   );
 }

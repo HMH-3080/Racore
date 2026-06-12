@@ -19,6 +19,11 @@ const { values: opts, positionals } = parseArgs({
     team: { type: "string" },
     mode: { type: "string" },
     model: { type: "string" },
+    prompt: { type: "string", short: "p" },
+    continue: { type: "boolean", default: false },
+    resume: { type: "boolean", default: false },
+    json: { type: "boolean", default: false },
+    yolo: { type: "boolean", default: false },
     help: { type: "boolean", default: false },
   },
   allowPositionals: true,
@@ -198,6 +203,15 @@ if (opts.help || subcommand === "help") {
   console.log("  racore --mode plan              Start in Plan mode");
   console.log("  racore --model <model>          Start with a specific model");
   console.log("");
+  console.log("Headless agent mode:");
+  console.log("  racore -p \"task\"                Run the agent non-interactively and print the result");
+  console.log("  racore -p \"task\" --json         Emit machine-readable JSON output");
+  console.log("  racore -p \"task\" --continue     Continue the most recent session");
+  console.log("  racore -p \"task\" --yolo         Auto-approve dangerous commands (use with care)");
+  console.log("");
+  console.log("Sessions:");
+  console.log("  racore --resume                 Reopen the most recent session in the TUI");
+  console.log("");
   console.log("Team commands (headless):");
   console.log("  racore team list                List all teams");
   console.log("  racore team create <name>       Create a new team");
@@ -354,6 +368,10 @@ async function startConsoleMode() {
 if (opts.team) process.env["RACORE_TEAM"] = opts.team;
 if (opts.mode) process.env["RACORE_MODE"] = opts.mode;
 if (opts.model) process.env["RACORE_MODEL"] = opts.model;
+if (opts.prompt) process.env["RACORE_PROMPT"] = opts.prompt;
+if (opts.continue || opts.resume) process.env["RACORE_CONTINUE"] = "1";
+if (opts.json) process.env["RACORE_JSON"] = "1";
+if (opts.yolo) process.env["RACORE_YOLO"] = "1";
 
 if (process.versions.bun === undefined) {
   // Running under Node.js, try to spawn bun for TUI mode
@@ -373,8 +391,9 @@ if (process.versions.bun === undefined) {
     }
   });
 } else {
-  // Running under Bun, dynamically import the TUI app
+  // Running under Bun, dynamically import the headless runner or TUI app.
   // This avoids loading React / @opentui at start of headless commands under Node.js
-  const indexUrl = new URL("./index.js", import.meta.url).href;
+  const entry = opts.prompt ? "./headless.js" : "./index.js";
+  const indexUrl = new URL(entry, import.meta.url).href;
   await import(indexUrl);
 }

@@ -21,6 +21,7 @@ import { useDialog } from "../providers/dialog";
 import { useTheme } from "../providers/theme";
 import { usePromptConfig } from "../providers/prompt-config";
 import { Mode } from "../lib/app-schema";
+import { resolveCustomCommand } from "../lib/custom-commands";
 
 const MAX_VISIBLE_MENTIONS = 8;
 const CURRENT_DIRECTORY = process.cwd();
@@ -375,6 +376,14 @@ export function InputBar({ onSubmit, disabled = false, active = true }: Props) {
       textarea.setText("");
 
       if (!command?.action) {
+        // Fall back to user-defined commands from .racore/commands/*.md
+        const [name = "", ...rest] = text.slice(1).split(/\s+/);
+        const resolvedPrompt = resolveCustomCommand(name, rest.join(" "));
+        if (resolvedPrompt) {
+          onSubmit(resolvedPrompt);
+          return;
+        }
+
         toast.show({
           variant: "error",
           message: `Unknown command: ${text}. Type / to choose a command.`,

@@ -1,6 +1,6 @@
 {
   "name": "@loai/racore-cli",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "R'a Core standalone terminal AI coding assistant",
   "module": "src/index.tsx",
   "type": "module",
@@ -35,8 +35,8 @@
   "scripts": {
     "dev": "node ../../scripts/run-bun.mjs run --watch src/index.tsx",
     "prebuild": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\"",
-    "build": "node ../../scripts/run-bun.mjs build src/index.tsx --outdir dist --target bun",
-    "test": "node ../../scripts/run-bun.mjs test ./src/lib",
+    "build": "node ../../scripts/run-bun.mjs build src/index.tsx src/headless.ts --outdir dist --target bun",
+    "test": "node ../../scripts/run-bun.mjs test ./src/lib", "evals": "node evals/run-evals.mjs",
     "bump:patch": "node scripts/bump-version.mjs patch",
     "bump:minor": "node scripts/bump-version.mjs minor",
     "bump:major": "node scripts/bump-version.mjs major",

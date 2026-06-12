@@ -1,7 +1,7 @@
 import { TextAttributes } from "@opentui/core";
 import type { ReactNode } from "react";
 import { InputBar } from "./input-bar";
-import { Spinner } from "./spinner";
+import { LiveStatus } from "./live-status";
 import { usePromptConfig } from "../providers/prompt-config";
 import { useTheme } from "../providers/theme";
 
@@ -38,12 +38,7 @@ export function SessionShell({
       </scrollbox>
       <box flexDirection="column" paddingX={2} paddingTop={1} gap={1} flexShrink={0} border={["top"]} borderColor={colors.dimSeparator}>
         <box flexDirection="row" alignItems="center" gap={2} flexShrink={0}>
-          {loading ? (
-            <>
-              <Spinner mode={mode} />
-              {interruptible ? <text>esc to interrupt</text> : null}
-            </>
-          ) : null}
+          {loading ? <LiveStatus mode={mode} interruptible={interruptible} /> : null}
         </box>
         <InputBar onSubmit={onSubmit} disabled={inputDisabled} />
         <box flexDirection="row" gap={1} flexShrink={0} justifyContent="flex-end">

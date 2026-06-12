@@ -1,18 +1,25 @@
-import { APICallError, generateText, streamText, stepCountIs, tool, type ModelMessage, type StepResult, type ToolSet } from "ai";
+import { APICallError, generateText, streamText, stepCountIs, type ModelMessage, type StepResult, type ToolSet } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOpenAI } from "@ai-sdk/openai";
 import {
   Mode,
   ProviderId,
-  toolInputSchemas,
   type ChatMessage,
   type MessageMetadata,
   type ModeType,
+  type ProviderIdType,
 } from "./app-schema";
 import { formatAgentAccelerationContext, getAgentAccelerationContext } from "./agent-accelerator";
-import { executeLocalTool } from "./local-tools";
+import { beginCheckpoint } from "./checkpoint-store";
+import { compactMessages } from "./context-compactor";
+import { reportContextUsage } from "./context-usage-store";
+import { reportAgentActivity } from "./agent-activity-store";
+import { getMcpTools, hasMcpServersConfigured } from "./mcp";
+import { buildToolRegistry } from "./tool-registry";
 import { getModelCapabilities, getProviderModels } from "./models";
 import { getProviderAuth } from "./provider-auth";
 import { recordUsage } from "./usage-store";
+import { formatSkillsContext } from "./skills";
 
 const FAST_OPENROUTER_MODELS = [
   "google/gemini-2.5-flash",
@@ -21,38 +28,59 @@ const FAST_OPENROUTER_MODELS = [
   "meta-llama/llama-3.1-8b-instruct:free",
 ];
 
-function buildSystemPrompt(mode: ModeType, useTools: boolean, accelerationContext?: string | null) {
+function buildSystemPrompt(mode: ModeType, useTools: boolean, accelerationContext?: string | null, latestUserText?: string) {
   if (!useTools) {
     return "You are R'a Core. Reply briefly and directly.";
   }
 
-const speedProtocol = [
+  const speedProtocol = [
     "Speed protocol:",
     "Use the fast workspace context before broad exploration.",
     "Prefer readManyFiles, grepManyPatterns, affectedTests, and patchFile for compact parallel progress.",
     "Run focused verification before wider commands when tests are inferred.",
+    "After completing edits, call verifyChanges to typecheck and lint, then fix any reported errors before finishing.",
+    "Use gitStatus and gitDiff to ground yourself in the working tree before and after changes.",
   ].join(" ");
 
   const todoProtocol = [
-    "Todo tracking:",
-    "YOUR FIRST ACTION: Decompose the user's request into a list of specific, actionable todos using updateTodoList.",
-    "Keep each todo focused on one deliverable (one file, one command, one verification).",
-    "After creating todos, work through them one at a time.",
-    "Before each step, call getTodoList to see what's left.",
-    "As you start work on a todo, call updateTodoList to mark it as in_progress.",
-    "Once its deliverable is done, mark it as completed with a one-line result summary.",
-    "Periodically call getTodoList to ensure no todos were missed or left stuck.",
+    "Task plan protocol:",
+    "An intent controller may have already seeded a task plan. YOUR FIRST ACTION: call getTodoList.",
+    "If the plan is missing or incomplete, add the missing tasks with updateTodoList - never duplicate existing ones, and never restate the prompt as a task.",
+    "Keep each task focused on one verifiable deliverable.",
+    "Mark a task in_progress the moment you start it, and completed with a one-line result the moment it is done - this is the user-visible live progress signal.",
+    "Batch independent reads and checks in parallel to move through tasks fast.",
   ].join(" ");
 
-  const context = accelerationContext
-    ? `\n\n${accelerationContext}`
-    : "";
+  const completionProtocol = [
+    "Completion protocol:",
+    "NEVER stop while any task is pending or in_progress - keep working through getTodoList until everything is completed.",
+    "When ALL tasks are completed, end with a Final Report section (markdown heading): what was done, files changed, verification results, and anything the user should know.",
+    "Do not ask for permission to continue; continue.",
+  ].join(" ");
+
+  const skillsProtocol = [
+    "Skills:",
+    "Relevant skills may be injected below - apply them immediately when they match the task.",
+    "If a task matches a known domain, call listSkills/useSkill before improvising.",
+    "After solving a novel, repeatable problem, save it with createSkill so future runs are faster.",
+    "Tools prefixed mcp_ come from user-configured MCP servers - prefer them for their domains (databases, browsers, issue trackers).",
+  ].join(" ");
+
+  // Auto-inject relevant skills for the current task
+  const skillsContext = latestUserText ? formatSkillsContext(latestUserText) : null;
+
+  const contextParts: string[] = [];
+  if (accelerationContext) contextParts.push(accelerationContext);
+  if (skillsContext) contextParts.push(skillsContext);
+  const context = contextParts.length > 0 ? `\n\n${contextParts.join("\n\n")}` : "";
 
   if (mode === Mode.PLAN) {
     return [
       "You are R'a Core in Plan mode. Inspect carefully. Use only read-only tools. Keep answers concise.",
       speedProtocol,
       todoProtocol,
+      completionProtocol,
+      skillsProtocol,
     ].join(" ") + context;
   }
 
@@ -65,6 +93,8 @@ const speedProtocol = [
       "Keep results coordinated and concise.",
       speedProtocol,
       todoProtocol,
+      completionProtocol,
+      skillsProtocol,
     ].join(" ") + context;
   }
 
@@ -72,21 +102,42 @@ const speedProtocol = [
     "You are R'a Core, a local coding assistant. Use tools only when useful. Prefer precise edits and concise progress.",
     speedProtocol,
     todoProtocol,
+    completionProtocol,
+    skillsProtocol,
   ].join(" ") + context;
 }
 
-function getModel(modelId: string) {
-  const auth = getProviderAuth(ProviderId.OPENROUTER);
+const PROVIDER_BASE_URLS: Partial<Record<ProviderIdType, string>> = {
+  [ProviderId.ANTHROPIC]: "https://api.anthropic.com/v1",
+  [ProviderId.GEMINI]: "https://generativelanguage.googleapis.com/v1beta/openai",
+};
+
+function getOllamaBaseUrl() {
+  const host = process.env["OLLAMA_HOST"] ?? "http://localhost:11434";
+  return host.endsWith("/v1") ? host : `${host.replace(/\/$/, "")}/v1`;
+}
+
+function getModel(modelId: string, provider: ProviderIdType = ProviderId.OPENROUTER) {
+  const auth = getProviderAuth(provider);
   if (!auth.apiKey) {
-    throw new Error("OpenRouter is not connected");
+    throw new Error(`${provider} is not connected. Connect it in /config or set its API key environment variable.`);
   }
 
-  const openrouter = createOpenRouter({
+  if (provider === ProviderId.OPENROUTER) {
+    const openrouter = createOpenRouter({
+      apiKey: auth.apiKey,
+      appUrl: "https://github.com/loayabdalslam/racore",
+      appName: "R'a Core",
+    });
+    return openrouter.chat(modelId);
+  }
+
+  // Direct providers all speak the OpenAI-compatible protocol.
+  const client = createOpenAI({
     apiKey: auth.apiKey,
-    appUrl: "https://github.com/loayabdalslam/racore",
-    appName: "R'a Core",
+    baseURL: provider === ProviderId.OLLAMA ? getOllamaBaseUrl() : PROVIDER_BASE_URLS[provider],
   });
-  return openrouter.chat(modelId);
+  return client.chat(modelId);
 }
 
 function readProviderError(data: unknown): string | null {
@@ -326,6 +377,7 @@ async function streamModelText(params: {
 
   for await (const part of result.fullStream) {
     if (part.type === "text-delta") {
+      reportAgentActivity("responding");
       streamedText += part.text;
       params.streamingMessage.parts = buildStreamingParts(reasoningText, streamedText);
       params.streamingMessage.metadata = {
@@ -334,6 +386,7 @@ async function streamModelText(params: {
       };
       params.onUpdate?.(params.streamingMessage);
     } else if (params.supportsReasoning && part.type === "reasoning-delta") {
+      reportAgentActivity("thinking");
       reasoningText += part.text;
       params.streamingMessage.parts = buildStreamingParts(reasoningText, streamedText);
       params.streamingMessage.metadata = {
@@ -354,10 +407,15 @@ export async function submitChat(params: {
   messages: ChatMessage[];
   mode: ModeType;
   model: string;
+  provider?: ProviderIdType;
   onUpdate?: (message: ChatMessage) => void;
 }) {
+  const provider = params.provider ?? ProviderId.OPENROUTER;
+  reportAgentActivity("thinking");
   const startTime = Date.now();
-  const coreMessages = toModelMessages(params.messages);
+  const { messages: compactedMessages, compacted, estimatedTokens } = compactMessages(params.messages);
+  reportContextUsage({ estimatedTokens, compacted });
+  const coreMessages = toModelMessages(compactedMessages);
   const latestUserText = getLatestUserText(params.messages);
   const useTools = !isCasualPrompt(latestUserText);
   const maxSteps = !useTools
@@ -372,10 +430,17 @@ export async function submitChat(params: {
       .then(formatAgentAccelerationContext)
       .catch(() => null)
     : null;
-  const useHeavyTools = params.mode === Mode.ULTRA;
-  const usePlanningTools = params.mode === Mode.PLAN || params.mode === Mode.ULTRA;
+  if (useTools && params.mode !== Mode.PLAN) {
+    beginCheckpoint(latestUserText || "agent turn");
+  }
+  const mcpTools: ToolSet =
+    useTools && params.mode !== Mode.PLAN && hasMcpServersConfigured()
+      ? await getMcpTools().catch(() => ({}))
+      : {};
 
-  const modelIds = getRoutedOpenRouterCandidateModels(params.model, params.mode, latestUserText);
+  const modelIds = provider === ProviderId.OPENROUTER
+    ? getRoutedOpenRouterCandidateModels(params.model, params.mode, latestUserText)
+    : [params.model];
 
   let usedModelId = params.model;
   let usedSupportsReasoning = false;
@@ -389,126 +454,23 @@ export async function submitChat(params: {
     parts: [{ type: "text", text: "" }],
     metadata: {
       mode: params.mode,
-      provider: ProviderId.OPENROUTER,
+      provider,
       model: usedModelId,
     },
   };
 
   for (const modelId of modelIds) {
     usedModelId = modelId;
-    const model = getModel(modelId);
+    const model = getModel(modelId, provider);
     const capabilities = getModelCapabilities(modelId);
     const useModelTools = useTools && capabilities.supportsTools;
     usedSupportsReasoning = capabilities.supportsReasoning;
     streamedText = "";
     reasoningText = "";
 
-    const tools = useModelTools ? {
-    ...(usePlanningTools ? {
-      agentPlan: tool({
-      inputSchema: toolInputSchemas.agentPlan,
-      execute: async (input) => executeLocalTool("agentPlan", input, params.mode),
-      }),
-      repoIndex: tool({
-      inputSchema: toolInputSchemas.repoIndex,
-      execute: async (input) => executeLocalTool("repoIndex", input, params.mode),
-      }),
-      searchSymbols: tool({
-      inputSchema: toolInputSchemas.searchSymbols,
-      execute: async (input) => executeLocalTool("searchSymbols", input, params.mode),
-      }),
-    } : {}),
-    affectedTests: tool({
-      inputSchema: toolInputSchemas.affectedTests,
-      execute: async (input) => executeLocalTool("affectedTests", input, params.mode),
-    }),
-    ...(useHeavyTools ? {
-      readProjectMemory: tool({
-      inputSchema: toolInputSchemas.readProjectMemory,
-      execute: async (input) => executeLocalTool("readProjectMemory", input, params.mode),
-      }),
-      rememberProjectFact: tool({
-      inputSchema: toolInputSchemas.rememberProjectFact,
-      execute: async (input) => executeLocalTool("rememberProjectFact", input, params.mode),
-      }),
-    } : {}),
-    updateTodoList: tool({
-      inputSchema: toolInputSchemas.updateTodoList,
-      execute: async (input) => executeLocalTool("updateTodoList", input, params.mode),
-    }),
-    getTodoList: tool({
-      inputSchema: toolInputSchemas.getTodoList,
-      execute: async (input) => executeLocalTool("getTodoList", input, params.mode),
-    }),
-    readFile: tool({
-      inputSchema: toolInputSchemas.readFile,
-      execute: async (input) => executeLocalTool("readFile", input, params.mode),
-    }),
-    listDirectory: tool({
-      inputSchema: toolInputSchemas.listDirectory,
-      execute: async (input) => executeLocalTool("listDirectory", input, params.mode),
-    }),
-    glob: tool({
-      inputSchema: toolInputSchemas.glob,
-      execute: async (input) => executeLocalTool("glob", input, params.mode),
-    }),
-    grep: tool({
-      inputSchema: toolInputSchemas.grep,
-      execute: async (input) => executeLocalTool("grep", input, params.mode),
-    }),
-    readManyFiles: tool({
-      inputSchema: toolInputSchemas.readManyFiles,
-      execute: async (input) => executeLocalTool("readManyFiles", input, params.mode),
-    }),
-    grepManyPatterns: tool({
-      inputSchema: toolInputSchemas.grepManyPatterns,
-      execute: async (input) => executeLocalTool("grepManyPatterns", input, params.mode),
-    }),
-    writeFile: tool({
-      inputSchema: toolInputSchemas.writeFile,
-      execute: async (input) => executeLocalTool("writeFile", input, params.mode),
-    }),
-    ...(useHeavyTools ? {
-      writeManyFiles: tool({
-      inputSchema: toolInputSchemas.writeManyFiles,
-      execute: async (input) => executeLocalTool("writeManyFiles", input, params.mode),
-      }),
-    } : {}),
-    editFile: tool({
-      inputSchema: toolInputSchemas.editFile,
-      execute: async (input) => executeLocalTool("editFile", input, params.mode),
-    }),
-    patchFile: tool({
-      inputSchema: toolInputSchemas.patchFile,
-      execute: async (input) => executeLocalTool("patchFile", input, params.mode),
-    }),
-    bash: tool({
-      inputSchema: toolInputSchemas.bash,
-      execute: async (input) => executeLocalTool("bash", input, params.mode),
-    }),
-    ...(useHeavyTools ? {
-      invokeAI: tool({
-      inputSchema: toolInputSchemas.invokeAI,
-      execute: async (input) => {
-        const subtask = await generateText({
-          model,
-          system: "You are a focused sub-agent for R'a Core Ultra Mode. Solve the subtask concisely.",
-          messages: [
-            ...coreMessages,
-            {
-              role: "user",
-              content: [`Subtask: ${input.task}`, input.context ? `Context: ${input.context}` : ""].filter(Boolean).join("\n"),
-            },
-          ],
-          maxSteps: 2,
-          maxRetries: 0,
-        });
-
-        return { text: subtask.text };
-      },
-      }),
-    } : {}),
-    } : undefined;
+    const tools = useModelTools
+      ? buildToolRegistry({ mode: params.mode, model, coreMessages, mcpTools })
+      : undefined;
 
     try {
       streamingMessage.metadata = {
@@ -518,7 +480,7 @@ export async function submitChat(params: {
 
       const result = await streamModelText({
         model,
-        system: buildSystemPrompt(params.mode, useModelTools, accelerationContext),
+        system: buildSystemPrompt(params.mode, useModelTools, accelerationContext, latestUserText),
         messages: coreMessages,
         maxSteps,
         tools,
@@ -538,7 +500,7 @@ export async function submitChat(params: {
         try {
           const retry = await streamModelText({
             model,
-            system: buildSystemPrompt(params.mode, false, accelerationContext),
+            system: buildSystemPrompt(params.mode, false, accelerationContext, latestUserText),
             messages: coreMessages,
             maxSteps: 1,
             supportsStreaming: capabilities.supportsStreaming,
@@ -568,7 +530,7 @@ export async function submitChat(params: {
         try {
           const fallback = await generateText({
             model,
-            system: buildSystemPrompt(params.mode, useModelTools, accelerationContext),
+            system: buildSystemPrompt(params.mode, useModelTools, accelerationContext, latestUserText),
             messages: coreMessages,
             tools,
             maxSteps,
@@ -647,7 +609,7 @@ export async function submitChat(params: {
 
   const metadata: MessageMetadata = {
     mode: params.mode,
-    provider: ProviderId.OPENROUTER,
+    provider,
     model: usedModelId,
     durationMs: Date.now() - startTime,
   };
@@ -696,5 +658,6 @@ export async function submitChat(params: {
     toolCalls: toolCallCount,
   });
 
+  reportAgentActivity("idle");
   return assistantMessage;
 }

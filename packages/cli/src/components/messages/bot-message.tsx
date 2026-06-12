@@ -8,6 +8,20 @@ import { EmptyBorder } from "../border";
 import { DiffView } from "../diff-view";
 import { MarkdownText } from "./markdown-text";
 import { RTLText } from "../rtl-text";
+import { BRAILLE_FRAMES, DOTS_FRAMES } from "../../lib/animation-frames";
+import { useAnimationFrame } from "../../hooks/use-animation";
+
+/** Animated braille indicator shown while a tool call is executing. */
+function ToolRunningIndicator({ color }: { color: string }) {
+  const frame = useAnimationFrame(BRAILLE_FRAMES, 80, true);
+  return <text fg={color}>{frame} </text>;
+}
+
+/** Animated trailing dots for the live "streaming" footer label. */
+function StreamingDots() {
+  const dots = useAnimationFrame(DOTS_FRAMES, 240, true);
+  return <text attributes={TextAttributes.DIM}>streaming{dots}</text>;
+}
 
 type ClientMessagePart = Message["parts"][number];
 type ToolPart = Extract<ClientMessagePart, { type: `tool-${string}` }>;
@@ -116,7 +130,7 @@ export function BotMessage({ parts, model, mode, durationMs, streaming = false }
                   >
                     <box paddingBottom={hasDiff || isRunning ? 1 : 0}>
                       <RTLText attributes={TextAttributes.DIM}>
-                        {isRunning ? <text fg={colors.info}>⏳ </text> : null}
+                        {isRunning ? <ToolRunningIndicator color={colors.info} /> : null}
                         <em fg={colors.info}>{formatToolName(toolName)}:</em> {formatToolArgs(part)}
                         {part.state === "output-error" ? ` ${part.errorText}` : ""}
                         {isRunning ? <text attributes={TextAttributes.DIM}> running...</text> : null}
@@ -159,7 +173,7 @@ export function BotMessage({ parts, model, mode, durationMs, streaming = false }
             <text>{modeLabel}</text>
             <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>›</text>
             <text attributes={TextAttributes.DIM}>{model}</text>
-            {streaming ? <text attributes={TextAttributes.DIM}>streaming</text> : null}
+            {streaming ? <StreamingDots /> : null}
             {durationMs != null ? (
               <>
                 <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>›</text>

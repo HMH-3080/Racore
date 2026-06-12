@@ -7,4 +7,27 @@ dotenv.config({
   quiet: true,
 });
 
-await import("../dist/index.js");
+const args = process.argv.slice(2);
+
+function readFlag(name, short) {
+  const index = args.findIndex((arg) => arg === name || (short && arg === short));
+  if (index === -1) return null;
+  return args[index + 1] ?? "";
+}
+
+const prompt = readFlag("--prompt", "-p");
+const mode = readFlag("--mode");
+const model = readFlag("--model");
+
+if (mode) process.env.RACORE_MODE = mode;
+if (model) process.env.RACORE_MODEL = model;
+if (args.includes("--continue") || args.includes("--resume")) process.env.RACORE_CONTINUE = "1";
+if (args.includes("--json")) process.env.RACORE_JSON = "1";
+if (args.includes("--yolo")) process.env.RACORE_YOLO = "1";
+
+if (prompt !== null && prompt !== "") {
+  process.env.RACORE_PROMPT = prompt;
+  await import("../dist/headless.js");
+} else {
+  await import("../dist/index.js");
+}

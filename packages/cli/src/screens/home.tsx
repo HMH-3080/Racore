@@ -6,7 +6,7 @@ import { InputBar } from "../components/input-bar";
 import { BotMessage, ErrorMessage, UserMessage } from "../components/messages";
 import { TodoPanel } from "../components/todo-panel";
 
-import { Spinner } from "../components/spinner";
+import { LiveStatus } from "../components/live-status";
 import { useChat, type Message } from "../hooks/use-chat";
 import { type ModeType, type SessionRecord } from "../lib/app-schema";
 import { usePromptConfig } from "../providers/prompt-config";
@@ -77,7 +77,7 @@ function InlineChat({
           {messages.map((msg) => <ChatMessage key={msg.id} msg={msg} displayModel={model} />)}
           {status === "streaming" || status === "submitted" ? (
             <box paddingX={2}>
-              <Spinner mode={mode} />
+              <LiveStatus mode={mode} />
             </box>
           ) : null}
           {error ? <ErrorMessage message={error.message} /> : null}
