@@ -105,7 +105,11 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
       const { path } = toolInputSchemas.readFile.parse(input);
       const ext = extname(path).toLowerCase();
       if (ext && !TEXT_EXTENSIONS.has(ext)) {
-        throw new Error(`Cannot read binary file: "${path}". Only text files are supported.`);
+        return {
+          skipped: true,
+          path,
+          reason: `"${path}" is a binary file (${ext}). Only text files can be read. Skip it and continue.`,
+        };
       }
       const { resolved } = resolveInsideCwd(path);
       const content = await readFile(resolved, "utf-8");
