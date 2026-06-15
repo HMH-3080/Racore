@@ -83,6 +83,43 @@ OPENROUTER_API_KEY=sk-or-...
 
 ## Usage
 
+### Headless Agent Mode
+
+Run the full coding agent loop without the TUI:
+
+```bash
+racore run -p "fix the failing tests" --json
+racore --headless --prompt-file prompt.md --mode ultra --yolo
+echo "summarize this repo" | racore --stdin --json
+racore "create a README for this package"
+```
+
+Headless mode uses the same model, MCP, permissions, file, git, shell, skills,
+todo, verification, and auto-continue capabilities as the TUI. It exits with
+`0` when the task completes, `1` on errors, and `2` if the auto-continue safety
+limit is reached.
+
+Useful options:
+
+| Option | Description |
+|---|---|
+| `-p, --prompt <text>` | Prompt text |
+| `-f, --prompt-file <path>` | Read prompt from a file |
+| `--stdin` | Read prompt from stdin |
+| `--cwd <path>` | Run from another project directory |
+| `--provider <id>` | Select `openrouter`, `openai`, `anthropic`, `gemini`, or `ollama` |
+| `--model <id>` | Override the configured model |
+| `--mode <mode>` | `build`, `plan`, or `ultra` |
+| `--session <id>` | Continue a specific saved session |
+| `--continue` | Continue the most recent saved session |
+| `--title <text>` | Title for a new session |
+| `--json` | Emit machine-readable JSON with tokens, tool calls, and stop reason |
+| `--output <path>` | Write final text or JSON to a file |
+| `--max-rounds <n>` | Override the auto-continue round cap |
+| `--no-stream` | Print only the final text in text mode |
+| `--quiet` | Suppress stdout except errors/output file |
+| `--yolo` | Auto-approve dangerous actions |
+
 ### Command Palette
 
 Type `/` in the input bar to open the command menu:

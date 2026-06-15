@@ -1,32 +1,166 @@
 #!/usr/bin/env bun
 import dotenv from "dotenv";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+
+const args = process.argv.slice(2);
+
+function readOption(name, short) {
+  const longPrefix = `${name}=`;
+  const shortPrefix = short ? `${short}=` : "";
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === name || (short && arg === short)) {
+      return args[index + 1] ?? "";
+    }
+    if (arg?.startsWith(longPrefix)) {
+      return arg.slice(longPrefix.length);
+    }
+    if (shortPrefix && arg?.startsWith(shortPrefix)) {
+      return arg.slice(shortPrefix.length);
+    }
+  }
+
+  return null;
+}
+
+function hasFlag(name, short) {
+  return args.some((arg) => arg === name || (short && arg === short));
+}
+
+function positionalArgs() {
+  const result = [];
+  const valueFlags = new Set([
+    "--prompt",
+    "-p",
+    "--prompt-file",
+    "-f",
+    "--mode",
+    "--model",
+    "--provider",
+    "--session",
+    "--title",
+    "--cwd",
+    "--max-rounds",
+    "--output",
+    "-o",
+  ]);
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (!arg) continue;
+
+    if (valueFlags.has(arg)) {
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--") || /^-[a-zA-Z]/.test(arg)) {
+      continue;
+    }
+
+    result.push(arg);
+  }
+
+  return result;
+}
+
+function printHelp() {
+  console.log("R'a Core CLI");
+  console.log("");
+  console.log("Usage:");
+  console.log("  racore                                  Start the TUI");
+  console.log("  racore run -p \"task\"                    Run headless agent mode");
+  console.log("  racore --headless -p \"task\"             Run headless agent mode");
+  console.log("  racore \"task\"                           Run a positional prompt headlessly");
+  console.log("  Get-Content prompt.md | racore --stdin  Read prompt from stdin");
+  console.log("");
+  console.log("Headless options:");
+  console.log("  -p, --prompt <text>        Prompt text");
+  console.log("  -f, --prompt-file <path>   Read prompt from a file");
+  console.log("      --stdin                Read prompt from stdin");
+  console.log("      --cwd <path>           Run from another project directory");
+  console.log("      --provider <id>        openrouter, openai, anthropic, gemini, ollama");
+  console.log("      --model <id>           Model id for the selected provider");
+  console.log("      --mode <mode>          build, plan, or ultra");
+  console.log("      --session <id>         Continue a specific saved session");
+  console.log("      --continue             Continue the latest saved session");
+  console.log("      --title <text>         Title for a new session");
+  console.log("      --json                 Emit machine-readable JSON");
+  console.log("      --output <path>        Write final text/JSON to a file");
+  console.log("      --max-rounds <n>       Max auto-continue rounds");
+  console.log("      --no-stream            Print only the final answer in text mode");
+  console.log("      --quiet                Suppress stdout except errors/output file");
+  console.log("      --yolo                 Auto-approve dangerous actions");
+}
+
+if (hasFlag("--help", "-h") || args[0] === "help") {
+  printHelp();
+  process.exit(0);
+}
+
+if (hasFlag("--version", "-v")) {
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  console.log(pkg.version);
+  process.exit(0);
+}
+
+const cwd = readOption("--cwd");
+if (cwd) {
+  if (!existsSync(cwd)) {
+    console.error(`Path does not exist: ${cwd}`);
+    process.exit(1);
+  }
+  process.chdir(cwd);
+}
 
 dotenv.config({
   path: path.resolve(process.cwd(), ".env"),
   quiet: true,
 });
 
-const args = process.argv.slice(2);
-
-function readFlag(name, short) {
-  const index = args.findIndex((arg) => arg === name || (short && arg === short));
-  if (index === -1) return null;
-  return args[index + 1] ?? "";
+async function readStdinPrompt() {
+  if (!hasFlag("--stdin") && process.stdin.isTTY) return "";
+  const text = await Bun.stdin.text();
+  return text.trim();
 }
 
-const prompt = readFlag("--prompt", "-p");
-const mode = readFlag("--mode");
-const model = readFlag("--model");
+const positionals = positionalArgs();
+const subcommand = positionals[0];
+const explicitHeadless = subcommand === "run" || subcommand === "headless" || hasFlag("--headless");
+const positionalPrompt = explicitHeadless
+  ? positionals.slice(1).join(" ").trim()
+  : positionals.join(" ").trim();
+const promptFile = readOption("--prompt-file", "-f");
+const promptFromFile = promptFile ? readFileSync(path.resolve(process.cwd(), promptFile), "utf8").trim() : "";
+const promptFromFlag = readOption("--prompt", "-p");
+const prompt = promptFromFlag || promptFromFile || positionalPrompt || await readStdinPrompt();
+const mode = readOption("--mode");
+const model = readOption("--model");
+const provider = readOption("--provider");
+const session = readOption("--session");
+const title = readOption("--title");
+const maxRounds = readOption("--max-rounds");
+const output = readOption("--output", "-o");
 
 if (mode) process.env.RACORE_MODE = mode;
 if (model) process.env.RACORE_MODEL = model;
-if (args.includes("--continue") || args.includes("--resume")) process.env.RACORE_CONTINUE = "1";
-if (args.includes("--json")) process.env.RACORE_JSON = "1";
-if (args.includes("--yolo")) process.env.RACORE_YOLO = "1";
+if (provider) process.env.RACORE_PROVIDER = provider;
+if (session) process.env.RACORE_SESSION_ID = session;
+if (title) process.env.RACORE_SESSION_TITLE = title;
+if (maxRounds) process.env.RACORE_MAX_ROUNDS = maxRounds;
+if (output) process.env.RACORE_OUTPUT = output;
+if (hasFlag("--continue") || hasFlag("--resume")) process.env.RACORE_CONTINUE = "1";
+if (hasFlag("--json")) process.env.RACORE_JSON = "1";
+if (hasFlag("--yolo") || hasFlag("--allow-dangerous")) process.env.RACORE_YOLO = "1";
+if (hasFlag("--no-stream")) process.env.RACORE_NO_STREAM = "1";
+if (hasFlag("--quiet")) process.env.RACORE_QUIET = "1";
 
-if (prompt !== null && prompt !== "") {
-  process.env.RACORE_PROMPT = prompt;
+const shouldRunHeadless = explicitHeadless || prompt !== "" || Boolean(promptFile) || hasFlag("--stdin") || hasFlag("--headless");
+
+if (shouldRunHeadless) {
+  if (prompt !== "") process.env.RACORE_PROMPT = prompt;
   await import("../dist/headless.js");
 } else {
   await import("../dist/index.js");
