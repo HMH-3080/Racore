@@ -80,7 +80,7 @@ function InlineChat({
               <LiveStatus mode={mode} />
             </box>
           ) : null}
-          {error ? <ErrorMessage message={error.message} /> : null}
+          {error ? <ErrorMessage title="Chat error" message={error.message} details={error.stack} /> : null}
         </box>
       </scrollbox>
     </box>

@@ -51,6 +51,20 @@ function formatToolArgs(toolPart: ToolPart): string {
   return Object.values(toolPart.input).map(String).join(" ");
 }
 
+function formatToolError(part: ToolPart): string {
+  if (part.errorText) return part.errorText;
+
+  if (typeof part.output === "string") return part.output;
+
+  if (part.output == null) return "Tool failed without returning an error message.";
+
+  try {
+    return JSON.stringify(part.output, null, 2);
+  } catch {
+    return String(part.output);
+  }
+}
+
 type PartGroup = {
   type: ClientMessagePart["type"];
   parts: ClientMessagePart[];
@@ -98,9 +112,14 @@ export function BotMessage({ parts, model, mode, durationMs, streaming = false }
                   width="100%"
                   paddingX={2}
                 >
-                  <RTLText attributes={TextAttributes.DIM}>
-                    <em fg={colors.thinking}>Thinking:</em> {part.text}
-                  </RTLText>
+                  <box flexDirection="column" gap={0} width="100%">
+                    <text fg={colors.thinking} attributes={TextAttributes.DIM}>
+                      Thinking:
+                    </text>
+                    <RTLText attributes={TextAttributes.DIM}>
+                      {part.text}
+                    </RTLText>
+                  </box>
                 </box>
               );
             }
@@ -111,6 +130,7 @@ export function BotMessage({ parts, model, mode, durationMs, streaming = false }
               const output = part.output as { diff?: DiffLine[]; path?: string; dirsCreated?: string[] } | undefined;
               const hasDiff = isFileOp && output?.diff && output.diff.length > 0;
               const isRunning = part.state === "input-available" || part.state === undefined;
+              const errorText = part.state === "output-error" ? formatToolError(part) : "";
 
               return (
                 <box
@@ -128,14 +148,38 @@ export function BotMessage({ parts, model, mode, durationMs, streaming = false }
                     flexDirection="column"
                     gap={0}
                   >
-                    <box paddingBottom={hasDiff || isRunning ? 1 : 0}>
-                      <RTLText attributes={TextAttributes.DIM}>
-                        {isRunning ? <ToolRunningIndicator color={colors.info} /> : null}
-                        <em fg={colors.info}>{formatToolName(toolName)}:</em> {formatToolArgs(part)}
-                        {part.state === "output-error" ? ` ${part.errorText}` : ""}
-                        {isRunning ? <text attributes={TextAttributes.DIM}> running...</text> : null}
-                      </RTLText>
+                    <box paddingBottom={hasDiff || isRunning || errorText ? 1 : 0} flexDirection="row" gap={1} width="100%">
+                      {isRunning ? <ToolRunningIndicator color={colors.info} /> : null}
+                      <text fg={colors.info} attributes={TextAttributes.DIM}>
+                        {formatToolName(toolName)}:
+                      </text>
+                      {formatToolArgs(part) ? (
+                        <RTLText attributes={TextAttributes.DIM} wrapMode="word">
+                          {formatToolArgs(part)}
+                        </RTLText>
+                      ) : null}
+                      {isRunning ? <text attributes={TextAttributes.DIM}>running...</text> : null}
                     </box>
+                    {errorText ? (
+                      <box
+                        border={["left"]}
+                        borderColor={colors.error}
+                        customBorderChars={{ ...EmptyBorder, vertical: "┃" }}
+                        paddingX={2}
+                        paddingY={1}
+                        width="100%"
+                        backgroundColor={colors.surface}
+                      >
+                        <box flexDirection="column" gap={1} width="100%">
+                          <text fg={colors.error} attributes={TextAttributes.BOLD}>
+                            Tool error details
+                          </text>
+                          <RTLText fg={colors.error} wrapMode="word">
+                            {errorText}
+                          </RTLText>
+                        </box>
+                      </box>
+                    ) : null}
                     {hasDiff ? (
                       <DiffView
                         filePath={output!.path!}

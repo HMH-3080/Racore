@@ -5,6 +5,7 @@
  * the most recent session.
  */
 import { Mode, type ChatMessage, type ModeType } from "./lib/app-schema";
+import { continueAgentLoop } from "./lib/agent-loop";
 import { submitChat } from "./lib/chat-service";
 import { loadConfig } from "./lib/config-store";
 import { createSession, listSessions, saveSession } from "./lib/session-store";
@@ -27,6 +28,29 @@ function extractText(message: ChatMessage): string {
 
 function countToolCalls(message: ChatMessage): number {
   return message.parts.filter((part) => part.type.startsWith("tool-")).length;
+}
+
+function getLatestAssistantMessage(messages: ChatMessage[]) {
+  return [...messages].reverse().find((message) => message.role === "assistant") ?? null;
+}
+
+function countToolCallsInMessages(messages: ChatMessage[]): number {
+  return messages
+    .filter((message) => message.role === "assistant")
+    .reduce((sum, message) => sum + countToolCalls(message), 0);
+}
+
+function sumUsage(messages: ChatMessage[]) {
+  return messages
+    .filter((message) => message.role === "assistant")
+    .reduce(
+      (totals, message) => ({
+        inputTokens: totals.inputTokens + (message.metadata?.inputTokens ?? 0),
+        outputTokens: totals.outputTokens + (message.metadata?.outputTokens ?? 0),
+        totalTokens: totals.totalTokens + (message.metadata?.totalTokens ?? 0),
+      }),
+      { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+    );
 }
 
 async function main() {
@@ -53,7 +77,15 @@ async function main() {
   };
   const messages = [...session.messages, userMessage];
 
-  let lastPrinted = 0;
+  const printedLengths = new Map<string, number>();
+  const printUpdate = (message: ChatMessage) => {
+    const text = extractText(message);
+    const lastPrinted = printedLengths.get(message.id) ?? 0;
+    if (text.length > lastPrinted) {
+      process.stdout.write(text.slice(lastPrinted));
+      printedLengths.set(message.id, text.length);
+    }
+  };
   const startTime = Date.now();
 
   try {
@@ -64,38 +96,67 @@ async function main() {
       provider: config.activeProvider,
       onUpdate: json
         ? undefined
-        : (message) => {
-            const text = extractText(message);
-            if (text.length > lastPrinted) {
-              process.stdout.write(text.slice(lastPrinted));
-              lastPrinted = text.length;
-            }
-          },
+        : printUpdate,
     });
 
-    session.messages = [...messages, assistantMessage];
+    let currentMessages = [...messages, assistantMessage];
+    session.messages = currentMessages;
     saveSession(session);
 
-    const finalText = extractText(assistantMessage);
+    const loopResult = await continueAgentLoop({
+      messages: currentMessages,
+      mode,
+      model,
+      provider: config.activeProvider,
+      submitChat,
+      onContinuationStart: () => {
+        if (!json) process.stdout.write("\n");
+      },
+      onUpdate: json ? undefined : printUpdate,
+      onRoundComplete: ({ messages: nextMessages }) => {
+        currentMessages = nextMessages;
+        session.messages = currentMessages;
+        saveSession(session);
+      },
+    });
+
+    currentMessages = loopResult.messages;
+    session.messages = currentMessages;
+    saveSession(session);
+
+    if (loopResult.stopReason === "error") {
+      throw loopResult.error;
+    }
+
+    const finalAssistantMessage = getLatestAssistantMessage(currentMessages) ?? assistantMessage;
+    const finalText = extractText(finalAssistantMessage);
+    const usage = sumUsage(currentMessages);
+    const ok = loopResult.stopReason === "completed";
 
     if (json) {
       console.log(JSON.stringify({
-        ok: true,
+        ok,
         sessionId: session.id,
         mode,
-        model: assistantMessage.metadata?.model ?? model,
+        model: finalAssistantMessage.metadata?.model ?? model,
         durationMs: Date.now() - startTime,
-        toolCalls: countToolCalls(assistantMessage),
+        continuationRounds: loopResult.continuationRounds,
+        stopReason: loopResult.stopReason,
+        toolCalls: countToolCallsInMessages(currentMessages),
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
         text: finalText,
       }, null, 2));
     } else {
-      if (finalText.length > lastPrinted) {
-        process.stdout.write(finalText.slice(lastPrinted));
+      printUpdate(finalAssistantMessage);
+      if (!ok) {
+        console.error(`Headless loop stopped before completion: ${loopResult.stopReason}`);
       }
       process.stdout.write("\n");
     }
 
-    process.exit(0);
+    process.exit(ok ? 0 : 2);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (json) {

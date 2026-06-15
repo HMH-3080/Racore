@@ -88,7 +88,7 @@ function SessionChat({
           streaming={status === "streaming" && index === messages.length - 1 && msg.role === "assistant"}
         />
       ))}
-      {error ? <ErrorMessage message={error.message} /> : null}
+      {error ? <ErrorMessage title="Chat error" message={error.message} details={error.stack} /> : null}
     </SessionShell>
   );
 }

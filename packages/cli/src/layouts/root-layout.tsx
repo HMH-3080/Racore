@@ -7,6 +7,7 @@ import { ThemedRoot } from "./themed-root";
 import { PromptConfigProvider } from "../providers/prompt-config";
 import { UpdateNotifier } from "../components/update-notifier";
 import { ApprovalGate } from "../components/approval-gate";
+import { ErrorBoundary } from "../components/error-boundary";
 
 export function RootLayout() {
   return (
@@ -16,9 +17,11 @@ export function RootLayout() {
           <DialogProvider>
             <PromptConfigProvider>
               <ThemedRoot>
-                <UpdateNotifier />
-                <ApprovalGate />
-                <Outlet />
+                <ErrorBoundary>
+                  <UpdateNotifier />
+                  <ApprovalGate />
+                  <Outlet />
+                </ErrorBoundary>
               </ThemedRoot>
             </PromptConfigProvider>
           </DialogProvider>

@@ -257,7 +257,9 @@ function getOpenRouterCandidateModels(selectedModel: string): string[] {
 }
 
 function getRoutedOpenRouterCandidateModels(selectedModel: string, _mode: ModeType, _text: string): string[] {
-  return getOpenRouterCandidateModels(selectedModel);
+  // Use exactly the selected model — no automatic routing to other models.
+  // This ensures the model shown in the input bar is the one actually used.
+  return [selectedModel];
 }
 
 function toModelMessages(messages: ChatMessage[]): ModelMessage[] {
@@ -647,6 +649,16 @@ export async function submitChat(params: {
     totalTokens = inputTokens + outputTokens;
   }
 
+  const durationMs = Date.now() - startTime;
+  assistantMessage.metadata = {
+    ...assistantMessage.metadata,
+    durationMs,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    toolCalls: toolCallCount,
+  };
+
   recordUsage({
     model: usedModelId,
     mode: params.mode,
@@ -654,7 +666,7 @@ export async function submitChat(params: {
     outputTokens,
     totalTokens,
     cost: 0,
-    durationMs: Date.now() - startTime,
+    durationMs,
     toolCalls: toolCallCount,
   });
 

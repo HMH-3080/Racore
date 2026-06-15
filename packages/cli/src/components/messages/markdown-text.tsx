@@ -105,7 +105,9 @@ function renderSegment(segment: MarkdownSegment, colors: Record<string, string>,
       );
     case "italic":
       return (
-        <em key={`seg-${index}`}>{segment.text}</em>
+        <RTLText key={`seg-${index}`}>
+          {segment.text}
+        </RTLText>
       );
     case "inlineCode":
       return (

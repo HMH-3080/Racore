@@ -176,6 +176,10 @@ export type MessageMetadata = {
   model?: string;
   provider?: ProviderIdType;
   durationMs?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  toolCalls?: number;
 };
 
 export type TextPart = {
