@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { TextAttributes } from "@opentui/core";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { AppShell } from "../components/app-shell";
-import { DEFAULT_OPENROUTER_MODEL_ID } from "../lib/models";
 import { saveConfig } from "../lib/config-store";
+import { DEFAULT_OPENROUTER_MODEL_ID } from "../lib/models";
 import { connectProvider, isProviderConnected } from "../lib/provider-auth";
 import { getProviderDefinition } from "../lib/providers";
 import { useKeyboardLayer } from "../providers/keyboard-layer";
@@ -43,7 +43,13 @@ function OptionRow({
       id={id}
       width="100%"
       flexDirection="column"
-      backgroundColor={selected ? colors.selection : active ? colors.dialogSurface : colors.background}
+      backgroundColor={
+        selected
+          ? colors.selection
+          : active
+            ? colors.dialogSurface
+            : colors.background
+      }
       paddingX={2}
       paddingY={1}
       gap={1}
@@ -77,7 +83,9 @@ export function OnboardingScreen() {
   const { isTopLayer } = useKeyboardLayer();
   const { colors, currentTheme, setTheme, fontSize } = useTheme();
   const { provider, setProvider, mode, model, setModel } = usePromptConfig();
-  const [loginConnected, setLoginConnected] = useState(() => isProviderConnected(provider));
+  const [loginConnected, setLoginConnected] = useState(() =>
+    isProviderConnected(provider),
+  );
   const [stepIndex, setStepIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -85,11 +93,7 @@ export function OnboardingScreen() {
   const contentHeight = Math.max(12, Math.min(20, dimensions.height - 13));
   const rowHeight = 4;
   const itemsLength =
-    step.id === "theme"
-      ? THEMES.length
-      : step.id === "login"
-        ? 1
-        : 0;
+    step.id === "theme" ? THEMES.length : step.id === "login" ? 1 : 0;
   const continueIndex = itemsLength;
 
   const finishOnboarding = () => {
@@ -125,11 +129,17 @@ export function OnboardingScreen() {
         await connectProvider(provider);
         setProvider(provider);
         setLoginConnected(true);
-        toast.show({ variant: "success", message: `${definition.label} connected.` });
+        toast.show({
+          variant: "success",
+          message: `${definition.label} connected.`,
+        });
       } catch (error) {
         toast.show({
           variant: "error",
-          message: error instanceof Error ? error.message : `${definition.label} login failed.`,
+          message:
+            error instanceof Error
+              ? error.message
+              : `${definition.label} login failed.`,
         });
       }
       return;
@@ -208,7 +218,8 @@ export function OnboardingScreen() {
       </box>
       <box width="100%" justifyContent="center">
         <text fg={colors.dimSeparator} wrapMode="word" textAlign="center">
-          First run setup. Pick a theme and connect OpenRouter. Default model: {DEFAULT_OPENROUTER_MODEL_ID}.
+          First run setup. Pick a theme and connect OpenRouter. Default model:{" "}
+          {DEFAULT_OPENROUTER_MODEL_ID}.
         </text>
       </box>
       <box width="100%" flexDirection="row" justifyContent="center" gap={2}>
