@@ -1,7 +1,7 @@
-import { useEffect, useRef, type ReactNode } from "react";
 import type { ScrollBoxRenderable } from "@opentui/core";
-import { Header } from "./header";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useTheme } from "../providers/theme";
+import { Header } from "./header";
 
 type AppShellProps = {
   children: ReactNode;
@@ -9,6 +9,7 @@ type AppShellProps = {
   maxWidth?: number;
   contentHeight?: number;
   scrollTop?: number;
+  scrollToElementId?: string;
 };
 
 export function AppShell({
@@ -17,6 +18,7 @@ export function AppShell({
   maxWidth,
   contentHeight,
   scrollTop,
+  scrollToElementId,
 }: AppShellProps) {
   const { colors, fontSize } = useTheme();
   const scrollRef = useRef<ScrollBoxRenderable>(null);
@@ -24,9 +26,17 @@ export function AppShell({
     maxWidth ?? (fontSize === "Small" ? 82 : fontSize === "Large" ? 66 : 74);
 
   useEffect(() => {
+    if (!scrollRef.current) return;
+
+    if (scrollToElementId) {
+      console.log("Scrolling to element:", scrollToElementId);
+      scrollRef.current.scrollChildIntoView(scrollToElementId);
+      return;
+    }
+
     if (typeof scrollTop !== "number") return;
-    scrollRef.current?.scrollTo(Math.max(0, scrollTop));
-  }, [scrollTop]);
+    scrollRef.current.scrollTo(Math.max(0, scrollTop));
+  }, [scrollTop, scrollToElementId]);
 
   return (
     <box
@@ -58,7 +68,12 @@ export function AppShell({
           borderColor={colors.dimSeparator}
         >
           {typeof contentHeight === "number" ? (
-            <scrollbox ref={scrollRef} height={contentHeight}>
+            <scrollbox
+              ref={scrollRef}
+              height={contentHeight}
+              stickyStart="top"
+              stickyScroll
+            >
               <box width="100%" flexDirection="column" gap={1} paddingRight={1}>
                 {children}
               </box>
