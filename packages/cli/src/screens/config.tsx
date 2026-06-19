@@ -22,17 +22,20 @@ function SettingsRow({
   actionLabel,
   selected,
   onSelect,
+  id,
 }: {
   label: string;
   value: string;
   actionLabel: string;
   selected: boolean;
   onSelect: () => void;
+  id: number;
 }) {
   const { colors } = useTheme();
 
   return (
     <box
+      id={`settings-row-${id}`}
       width="100%"
       flexDirection="column"
       paddingX={2}
@@ -160,6 +163,42 @@ export function ConfigScreen() {
     }
   });
 
+  const settingsRows = [
+    {
+      label: "Provider",
+      value: definition.label,
+      actionLabel: "Setup",
+      onSelect: actions[0],
+    },
+    {
+      label: "CLI Login",
+      value: "Login to OpenRouter from the CLI and create a local Racore key.",
+      actionLabel: "Login",
+      onSelect: actions[1],
+    },
+    {
+      label: "Mode",
+      value: getModeLabel(mode),
+      actionLabel: "Select",
+      onSelect: actions[2],
+    },
+    {
+      label: "Theme",
+      value: currentTheme.name,
+      actionLabel: "Dropdown",
+      onSelect: actions[3],
+    },
+    {
+      label: "Font Size",
+      value: fontSize,
+      actionLabel: "Dropdown",
+      onSelect: actions[4],
+    },
+  ];
+
+  const scrollToElementId =
+    selectedIndex > 0 ? `settings-row-${selectedIndex}` : "settings-row-top";
+
   return (
     <AppShell
       maxWidth={fontSize === "Small" ? 82 : fontSize === "Large" ? 68 : 74}
@@ -191,7 +230,7 @@ export function ConfigScreen() {
         </box>
       }
     >
-      <box width="100%" justifyContent="center">
+      <box width="100%" justifyContent="center" id="settings-row-top">
         <text attributes={TextAttributes.BOLD}>CONFIGURATION</text>
       </box>
       <box width="100%" justifyContent="center">
@@ -199,41 +238,17 @@ export function ConfigScreen() {
           Racore now runs through OpenRouter only. Configure login, mode, theme, and model here.
         </text>
       </box>
+      {settingsRows.map((row, index) => (
       <SettingsRow
-        label="Provider"
-        value={definition.label}
-        actionLabel="Setup"
-        selected={selectedIndex === 0}
-        onSelect={actions[0]}
+          key={index + row.label}
+          label={row.label}
+          value={row.value}
+          actionLabel={row.actionLabel}
+          selected={selectedIndex === index}
+          onSelect={row.onSelect}
+          id={index}
       />
-      <SettingsRow
-        label="CLI Login"
-        value="Login to OpenRouter from the CLI and create a local Racore key."
-        actionLabel="Login"
-        selected={selectedIndex === 1}
-        onSelect={actions[1]}
-      />
-      <SettingsRow
-        label="Mode"
-        value={getModeLabel(mode)}
-        actionLabel="Select"
-        selected={selectedIndex === 2}
-        onSelect={actions[2]}
-      />
-      <SettingsRow
-        label="Theme"
-        value={currentTheme.name}
-        actionLabel="Dropdown"
-        selected={selectedIndex === 3}
-        onSelect={actions[3]}
-      />
-      <SettingsRow
-        label="Font Size"
-        value={fontSize}
-        actionLabel="Dropdown"
-        selected={selectedIndex === 4}
-        onSelect={actions[4]}
-      />
+      ))}
       <box width="100%" justifyContent="center">
         <text fg={colors.dimSeparator} wrapMode="word" textAlign="center">
           Tab on the main page now cycles Normal, Plan, and Ultra.
