@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { TextAttributes } from "@opentui/core";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { AppShell } from "../components/app-shell";
 import {
@@ -9,12 +9,12 @@ import {
   ThemeDialogContent,
 } from "../components/dialogs";
 import { getModeLabel } from "../components/dialogs/agents-dialog";
+import { connectProvider } from "../lib/provider-auth";
+import { getProviderDefinition } from "../lib/providers";
 import { useDialog } from "../providers/dialog";
 import { useKeyboardLayer } from "../providers/keyboard-layer";
 import { usePromptConfig } from "../providers/prompt-config";
 import { useTheme } from "../providers/theme";
-import { connectProvider } from "../lib/provider-auth";
-import { getProviderDefinition } from "../lib/providers";
 
 function SettingsRow({
   label,
@@ -102,7 +102,9 @@ export function ConfigScreen() {
           children: (
             <box flexDirection="column" gap={1}>
               <text fg={colors.error} wrapMode="word">
-                {error instanceof Error ? error.message : "Provider login failed."}
+                {error instanceof Error
+                  ? error.message
+                  : "Provider login failed."}
               </text>
             </box>
           ),
@@ -113,10 +115,7 @@ export function ConfigScreen() {
       dialog.open({
         title: "Select Mode",
         children: (
-          <AgentsDialogContent
-            currentMode={mode}
-            onSelectMode={setMode}
-          />
+          <AgentsDialogContent currentMode={mode} onSelectMode={setMode} />
         ),
       });
     },
@@ -230,11 +229,12 @@ export function ConfigScreen() {
       </box>
       <box width="100%" justifyContent="center">
         <text fg={colors.dimSeparator} wrapMode="word" textAlign="center">
-          Racore now runs through OpenRouter only. Configure login, mode, theme, and model here.
+          Racore now runs through OpenRouter only. Configure login, mode, theme,
+          and model here.
         </text>
       </box>
       {settingsRows.map((row, index) => (
-      <SettingsRow
+        <SettingsRow
           key={index + row.label}
           label={row.label}
           value={row.value}
@@ -242,7 +242,7 @@ export function ConfigScreen() {
           selected={selectedIndex === index}
           onSelect={row.onSelect}
           id={index}
-      />
+        />
       ))}
       <box width="100%" justifyContent="center">
         <text fg={colors.dimSeparator} wrapMode="word" textAlign="center">
