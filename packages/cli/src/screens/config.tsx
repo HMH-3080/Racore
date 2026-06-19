@@ -88,11 +88,6 @@ export function ConfigScreen() {
   const definition = getProviderDefinition(provider);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const contentHeight = Math.max(10, Math.min(18, dimensions.height - 16));
-  const rowHeight = 3;
-  const centeredScrollTop = Math.max(
-    0,
-    selectedIndex * rowHeight - Math.floor(contentHeight / 2) + Math.ceil(rowHeight / 2),
-  );
 
   const actions = [
     () => navigate(`/config/provider/${provider}`),
@@ -203,7 +198,7 @@ export function ConfigScreen() {
     <AppShell
       maxWidth={fontSize === "Small" ? 82 : fontSize === "Large" ? 68 : 74}
       contentHeight={contentHeight}
-      scrollTop={centeredScrollTop}
+      scrollToElementId={scrollToElementId}
       footer={
         <box flexDirection="row" gap={2}>
           <text
