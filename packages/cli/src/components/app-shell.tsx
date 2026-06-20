@@ -68,12 +68,7 @@ export function AppShell({
           borderColor={colors.dimSeparator}
         >
           {typeof contentHeight === "number" ? (
-            <scrollbox
-              ref={scrollRef}
-              height={contentHeight}
-              stickyStart="top"
-              stickyScroll
-            >
+            <scrollbox ref={scrollRef} height={contentHeight}>
               <box width="100%" flexDirection="column" gap={1} paddingRight={1}>
                 {children}
               </box>
