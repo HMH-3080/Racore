@@ -194,7 +194,9 @@ export function OnboardingScreen() {
 
   const scrollToElementId =
     selectedIndex > 0
-      ? `${idMap[stepIndex]}-${selectedIndex}`
+      ? selectedIndex < itemsLength
+        ? `${idMap[stepIndex]}-${selectedIndex}`
+        : "onboarding-row-bottom"
       : "onboarding-row-top";
 
   return (
@@ -294,7 +296,7 @@ export function OnboardingScreen() {
           }}
         />
       )}
-      <box width="100%" justifyContent="center">
+      <box width="100%" justifyContent="center" id={`onboarding-row-bottom`}>
         <text attributes={TextAttributes.DIM}>
           Up/Down to move. Enter to choose. Left/Right changes step.
         </text>

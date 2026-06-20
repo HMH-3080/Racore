@@ -191,7 +191,11 @@ export function ConfigScreen() {
   ];
 
   const scrollToElementId =
-    selectedIndex > 0 ? `settings-row-${selectedIndex}` : "settings-row-top";
+    selectedIndex > 0
+      ? selectedIndex < settingsRows.length - 1
+        ? `settings-row-${selectedIndex}`
+        : "settings-row-bottom"
+      : "settings-row-top";
 
   return (
     <AppShell
@@ -249,7 +253,7 @@ export function ConfigScreen() {
           Tab on the main page now cycles Normal, Plan, and Ultra.
         </text>
       </box>
-      <box width="100%" justifyContent="center">
+      <box width="100%" justifyContent="center" id="settings-row-bottom">
         <text attributes={TextAttributes.DIM}>
           Up/Down to move. Enter to select.
         </text>
