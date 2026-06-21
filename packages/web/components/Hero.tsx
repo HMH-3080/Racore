@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { Button } from "./Button";
 
 export const Hero: React.FC = () => {
@@ -14,12 +15,16 @@ export const Hero: React.FC = () => {
             Auto-decomposes tasks, auto-continues, and ships code.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button variant="primary" className="text-lg px-8 py-4">
-              Download R'a Core
-            </Button>
-            <Button variant="secondary" className="text-lg px-8 py-4">
-              View Documentation
-            </Button>
+            <Link href="https://www.npmjs.com/package/@loai/racore-cli" target="_blank" rel="noopener noreferrer">
+              <Button variant="primary" className="text-lg px-8 py-4">
+                Download R'a Core
+              </Button>
+            </Link>
+            <Link href="/docs">
+              <Button variant="secondary" className="text-lg px-8 py-4">
+                View Documentation
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

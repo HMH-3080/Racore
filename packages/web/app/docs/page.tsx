@@ -39,7 +39,7 @@ npm run dev`}
 
           <h3 className="text-headline font-bold mb-2">First Run</h3>
           <ol className="list-decimal ml-6 text-body text-ink-muted mb-6 space-y-1">
-            <li>Start R'a Core: <code className="text-accent-blue">racore</code></li>
+            <li>After installation, just type <code className="text-accent-blue">racore</code> in your terminal!</li>
             <li>Complete the onboarding wizard</li>
             <li>Connect your OpenRouter account (OAuth or API key)</li>
             <li>Start coding!</li>
