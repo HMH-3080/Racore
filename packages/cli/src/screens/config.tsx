@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { TextAttributes } from "@opentui/core";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { AppShell } from "../components/app-shell";
 import {
@@ -9,12 +9,12 @@ import {
   ThemeDialogContent,
 } from "../components/dialogs";
 import { getModeLabel } from "../components/dialogs/agents-dialog";
+import { connectProvider } from "../lib/provider-auth";
+import { getProviderDefinition } from "../lib/providers";
 import { useDialog } from "../providers/dialog";
 import { useKeyboardLayer } from "../providers/keyboard-layer";
 import { usePromptConfig } from "../providers/prompt-config";
 import { useTheme } from "../providers/theme";
-import { connectProvider } from "../lib/provider-auth";
-import { getProviderDefinition } from "../lib/providers";
 
 function SettingsRow({
   label,
@@ -22,17 +22,20 @@ function SettingsRow({
   actionLabel,
   selected,
   onSelect,
+  id,
 }: {
   label: string;
   value: string;
   actionLabel: string;
   selected: boolean;
   onSelect: () => void;
+  id: string;
 }) {
   const { colors } = useTheme();
 
   return (
     <box
+      id={id}
       width="100%"
       flexDirection="column"
       paddingX={2}
@@ -75,6 +78,8 @@ function SettingsRow({
   );
 }
 
+const ROW_ID = "settings-row";
+
 export function ConfigScreen() {
   const navigate = useNavigate();
   const dialog = useDialog();
@@ -85,11 +90,6 @@ export function ConfigScreen() {
   const definition = getProviderDefinition(provider);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const contentHeight = Math.max(10, Math.min(18, dimensions.height - 16));
-  const rowHeight = 3;
-  const centeredScrollTop = Math.max(
-    0,
-    selectedIndex * rowHeight - Math.floor(contentHeight / 2) + Math.ceil(rowHeight / 2),
-  );
 
   const actions = [
     () => navigate(`/config/provider/${provider}`),
@@ -104,7 +104,9 @@ export function ConfigScreen() {
           children: (
             <box flexDirection="column" gap={1}>
               <text fg={colors.error} wrapMode="word">
-                {error instanceof Error ? error.message : "Provider login failed."}
+                {error instanceof Error
+                  ? error.message
+                  : "Provider login failed."}
               </text>
             </box>
           ),
@@ -115,10 +117,7 @@ export function ConfigScreen() {
       dialog.open({
         title: "Select Mode",
         children: (
-          <AgentsDialogContent
-            currentMode={mode}
-            onSelectMode={setMode}
-          />
+          <AgentsDialogContent currentMode={mode} onSelectMode={setMode} />
         ),
       });
     },
@@ -160,11 +159,51 @@ export function ConfigScreen() {
     }
   });
 
+  const settingsRows = [
+    {
+      label: "Provider",
+      value: definition.label,
+      actionLabel: "Setup",
+      onSelect: actions[0],
+    },
+    {
+      label: "CLI Login",
+      value: "Login to OpenRouter from the CLI and create a local Racore key.",
+      actionLabel: "Login",
+      onSelect: actions[1],
+    },
+    {
+      label: "Mode",
+      value: getModeLabel(mode),
+      actionLabel: "Select",
+      onSelect: actions[2],
+    },
+    {
+      label: "Theme",
+      value: currentTheme.name,
+      actionLabel: "Dropdown",
+      onSelect: actions[3],
+    },
+    {
+      label: "Font Size",
+      value: fontSize,
+      actionLabel: "Dropdown",
+      onSelect: actions[4],
+    },
+  ];
+
+  const scrollToElementId =
+    selectedIndex > 0
+      ? selectedIndex < settingsRows.length - 1
+        ? `${ROW_ID}-${selectedIndex}`
+        : `${ROW_ID}-bottom`
+      : `${ROW_ID}-top`;
+
   return (
     <AppShell
       maxWidth={fontSize === "Small" ? 82 : fontSize === "Large" ? 68 : 74}
       contentHeight={contentHeight}
-      scrollTop={centeredScrollTop}
+      scrollToElementId={scrollToElementId}
       footer={
         <box flexDirection="row" gap={2}>
           <text
@@ -191,55 +230,32 @@ export function ConfigScreen() {
         </box>
       }
     >
-      <box width="100%" justifyContent="center">
+      <box width="100%" justifyContent="center" id={`${ROW_ID}-top`}>
         <text attributes={TextAttributes.BOLD}>CONFIGURATION</text>
       </box>
       <box width="100%" justifyContent="center">
         <text fg={colors.dimSeparator} wrapMode="word" textAlign="center">
-          Racore now runs through OpenRouter only. Configure login, mode, theme, and model here.
+          Racore now runs through OpenRouter only. Configure login, mode, theme,
+          and model here.
         </text>
       </box>
-      <SettingsRow
-        label="Provider"
-        value={definition.label}
-        actionLabel="Setup"
-        selected={selectedIndex === 0}
-        onSelect={actions[0]}
-      />
-      <SettingsRow
-        label="CLI Login"
-        value="Login to OpenRouter from the CLI and create a local Racore key."
-        actionLabel="Login"
-        selected={selectedIndex === 1}
-        onSelect={actions[1]}
-      />
-      <SettingsRow
-        label="Mode"
-        value={getModeLabel(mode)}
-        actionLabel="Select"
-        selected={selectedIndex === 2}
-        onSelect={actions[2]}
-      />
-      <SettingsRow
-        label="Theme"
-        value={currentTheme.name}
-        actionLabel="Dropdown"
-        selected={selectedIndex === 3}
-        onSelect={actions[3]}
-      />
-      <SettingsRow
-        label="Font Size"
-        value={fontSize}
-        actionLabel="Dropdown"
-        selected={selectedIndex === 4}
-        onSelect={actions[4]}
-      />
+      {settingsRows.map((row, index) => (
+        <SettingsRow
+          key={index + row.label}
+          label={row.label}
+          value={row.value}
+          actionLabel={row.actionLabel}
+          selected={selectedIndex === index}
+          onSelect={row.onSelect}
+          id={`${ROW_ID}-${index}`}
+        />
+      ))}
       <box width="100%" justifyContent="center">
         <text fg={colors.dimSeparator} wrapMode="word" textAlign="center">
           Tab on the main page now cycles Normal, Plan, and Ultra.
         </text>
       </box>
-      <box width="100%" justifyContent="center">
+      <box width="100%" justifyContent="center" id={`${ROW_ID}-bottom`}>
         <text attributes={TextAttributes.DIM}>
           Up/Down to move. Enter to select.
         </text>

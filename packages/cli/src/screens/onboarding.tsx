@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { TextAttributes } from "@opentui/core";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { AppShell } from "../components/app-shell";
-import { DEFAULT_OPENROUTER_MODEL_ID } from "../lib/models";
 import { saveConfig } from "../lib/config-store";
+import { DEFAULT_OPENROUTER_MODEL_ID } from "../lib/models";
 import { connectProvider, isProviderConnected } from "../lib/provider-auth";
 import { getProviderDefinition } from "../lib/providers";
 import { useKeyboardLayer } from "../providers/keyboard-layer";
@@ -27,20 +27,29 @@ function OptionRow({
   selected,
   active,
   onSelect,
+  id,
 }: {
   title: string;
   description: string;
   selected: boolean;
   active: boolean;
   onSelect: () => void;
+  id: string;
 }) {
   const { colors } = useTheme();
 
   return (
     <box
+      id={id}
       width="100%"
       flexDirection="column"
-      backgroundColor={selected ? colors.selection : active ? colors.dialogSurface : colors.background}
+      backgroundColor={
+        selected
+          ? colors.selection
+          : active
+            ? colors.dialogSurface
+            : colors.background
+      }
       paddingX={2}
       paddingY={1}
       gap={1}
@@ -61,6 +70,12 @@ function OptionRow({
   );
 }
 
+const idMap: Record<number, string> = {
+  0: "theme-row",
+  1: "login-row",
+  2: "finish-row",
+};
+
 export function OnboardingScreen() {
   const navigate = useNavigate();
   const toast = useToast();
@@ -68,24 +83,17 @@ export function OnboardingScreen() {
   const { isTopLayer } = useKeyboardLayer();
   const { colors, currentTheme, setTheme, fontSize } = useTheme();
   const { provider, setProvider, mode, model, setModel } = usePromptConfig();
-  const [loginConnected, setLoginConnected] = useState(() => isProviderConnected(provider));
+  const [loginConnected, setLoginConnected] = useState(() =>
+    isProviderConnected(provider),
+  );
   const [stepIndex, setStepIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const step = STEPS[stepIndex]!;
   const contentHeight = Math.max(12, Math.min(20, dimensions.height - 13));
-  const rowHeight = 4;
   const itemsLength =
-    step.id === "theme"
-      ? THEMES.length
-      : step.id === "login"
-        ? 1
-        : 0;
+    step.id === "theme" ? THEMES.length : step.id === "login" ? 1 : 0;
   const continueIndex = itemsLength;
-  const centeredScrollTop = Math.max(
-    0,
-    selectedIndex * rowHeight - Math.floor(contentHeight / 2) + Math.ceil(rowHeight / 2),
-  );
 
   const finishOnboarding = () => {
     if (model !== DEFAULT_OPENROUTER_MODEL_ID) {
@@ -120,11 +128,17 @@ export function OnboardingScreen() {
         await connectProvider(provider);
         setProvider(provider);
         setLoginConnected(true);
-        toast.show({ variant: "success", message: `${definition.label} connected.` });
+        toast.show({
+          variant: "success",
+          message: `${definition.label} connected.`,
+        });
       } catch (error) {
         toast.show({
           variant: "error",
-          message: error instanceof Error ? error.message : `${definition.label} login failed.`,
+          message:
+            error instanceof Error
+              ? error.message
+              : `${definition.label} login failed.`,
         });
       }
       return;
@@ -177,11 +191,18 @@ export function OnboardingScreen() {
     }
   });
 
+  const scrollToElementId =
+    selectedIndex > 0
+      ? selectedIndex < itemsLength
+        ? `${idMap[stepIndex]}-${selectedIndex}`
+        : "onboarding-row-bottom"
+      : "onboarding-row-top";
+
   return (
     <AppShell
       maxWidth={fontSize === "Small" ? 86 : fontSize === "Large" ? 70 : 78}
       contentHeight={contentHeight}
-      scrollTop={centeredScrollTop}
+      scrollToElementId={scrollToElementId}
       footer={
         <box flexDirection="row" gap={2}>
           <text fg={colors.info} onMouseDown={() => navigate("/config")}>
@@ -193,12 +214,13 @@ export function OnboardingScreen() {
         </box>
       }
     >
-      <box width="100%" justifyContent="center">
+      <box width="100%" justifyContent="center" id="onboarding-row-top">
         <text attributes={TextAttributes.BOLD}>WELCOME TO R'A CORE</text>
       </box>
       <box width="100%" justifyContent="center">
         <text fg={colors.dimSeparator} wrapMode="word" textAlign="center">
-          First run setup. Pick a theme and connect OpenRouter. Default model: {DEFAULT_OPENROUTER_MODEL_ID}.
+          First run setup. Pick a theme and connect OpenRouter. Default model:{" "}
+          {DEFAULT_OPENROUTER_MODEL_ID}.
         </text>
       </box>
       <box width="100%" flexDirection="row" justifyContent="center" gap={2}>
@@ -221,6 +243,7 @@ export function OnboardingScreen() {
       {step.id === "theme" &&
         THEMES.map((theme, index) => (
           <OptionRow
+            id={`${idMap[stepIndex]}-${index}`}
             key={theme.name}
             title={theme.name}
             description="Applies instantly to the CLI."
@@ -234,6 +257,7 @@ export function OnboardingScreen() {
         ))}
       {step.id === "login" && (
         <OptionRow
+          id={`${idMap[stepIndex]}`}
           title={`${getProviderDefinition(provider).shortLabel} CLI login`}
           description={
             loginConnected
@@ -250,6 +274,7 @@ export function OnboardingScreen() {
       )}
       {step.id === "finish" && (
         <OptionRow
+          id={`${idMap[stepIndex]}`}
           title="Finish onboarding"
           description={`Save ~/.racore/config.json and start with ${DEFAULT_OPENROUTER_MODEL_ID}.`}
           selected={selectedIndex === 0}
@@ -259,6 +284,7 @@ export function OnboardingScreen() {
       )}
       {step.id !== "finish" && (
         <OptionRow
+          id={`${idMap[stepIndex]}-${continueIndex}`}
           title="Continue"
           description={`Next: ${STEPS[stepIndex + 1]?.label}`}
           selected={selectedIndex === continueIndex}
@@ -269,7 +295,7 @@ export function OnboardingScreen() {
           }}
         />
       )}
-      <box width="100%" justifyContent="center">
+      <box width="100%" justifyContent="center" id={`onboarding-row-bottom`}>
         <text attributes={TextAttributes.DIM}>
           Up/Down to move. Enter to choose. Left/Right changes step.
         </text>
