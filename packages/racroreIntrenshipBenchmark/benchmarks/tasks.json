@@ -1,0 +1,212 @@
+[
+  {
+    "id": "task-01-coding-login-form",
+    "category": "Coding",
+    "difficulty": "junior",
+    "title": "Build a login form with validation",
+    "prompt": "Create a simple login form component with email and password fields, inline validation, submit loading state, and a small success message after submit. Keep the implementation production-clean and explain any assumptions in the final report."
+  },
+  {
+    "id": "task-02-fix-null-crash",
+    "category": "Fix bug",
+    "difficulty": "junior",
+    "title": "Fix a null access crash",
+    "prompt": "Find and fix a likely null or undefined access bug in the current project, add a safe guard, and verify the affected flow still works."
+  },
+  {
+    "id": "task-03-add-feature-shortcuts",
+    "category": "Add feature",
+    "difficulty": "junior",
+    "title": "Add keyboard shortcut support",
+    "prompt": "Add one useful keyboard shortcut to the current project, wire it into the existing UX cleanly, and document how the shortcut works in the final report."
+  },
+  {
+    "id": "task-04-write-api-health",
+    "category": "Write API",
+    "difficulty": "junior",
+    "title": "Write a health check API",
+    "prompt": "Add a lightweight health check API endpoint that returns status, timestamp, and app name. Follow existing project patterns and include a quick verification step."
+  },
+  {
+    "id": "task-05-refactor-config-loader",
+    "category": "Refactor code",
+    "difficulty": "junior",
+    "title": "Refactor a config loader",
+    "prompt": "Refactor a small configuration-related module to improve readability and reduce duplication without changing behavior. Keep the diff focused and explain the before/after benefits."
+  },
+  {
+    "id": "task-06-terminal-log-triage",
+    "category": "Terminal",
+    "difficulty": "junior",
+    "title": "Triage logs from the terminal",
+    "prompt": "Use terminal commands to inspect the workspace, identify one actionable issue from logs or diagnostics, and fix or document it with a concise verification step."
+  },
+  {
+    "id": "task-07-git-status-cleanup",
+    "category": "Git operations",
+    "difficulty": "junior",
+    "title": "Review git state and summarize risk",
+    "prompt": "Inspect the git working tree, summarize the current repo state, identify any risky pending changes, and prepare a short actionable summary for an engineer taking over."
+  },
+  {
+    "id": "task-08-dockerfile-basic",
+    "category": "Docker",
+    "difficulty": "junior",
+    "title": "Create or improve a Dockerfile",
+    "prompt": "Create or improve a development-friendly Dockerfile for this project, using sensible defaults and a clear command for local execution."
+  },
+  {
+    "id": "task-09-linux-command-audit",
+    "category": "Linux commands",
+    "difficulty": "junior",
+    "title": "Audit files with Linux-style shell tasks",
+    "prompt": "Use shell-friendly file inspection to identify the largest source directories or obvious cleanup candidates, then summarize what should be cleaned up and why."
+  },
+  {
+    "id": "task-10-install-lint-tooling",
+    "category": "Package installation",
+    "difficulty": "junior",
+    "title": "Install missing lint tooling",
+    "prompt": "Install a small missing development package that would improve code quality or workflow, integrate it minimally, and mention how to run it."
+  },
+  {
+    "id": "task-11-research-rate-limits",
+    "category": "Research",
+    "difficulty": "junior",
+    "title": "Research API rate-limit strategy",
+    "prompt": "Research best practices for API rate limiting for a small developer tool, then produce a concise recommendation tailored to this project."
+  },
+  {
+    "id": "task-12-read-docs-framework",
+    "category": "Read docs",
+    "difficulty": "junior",
+    "title": "Read framework docs and apply one improvement",
+    "prompt": "Read the relevant framework or library docs for this project and apply one small improvement based on documented best practices."
+  },
+  {
+    "id": "task-13-generate-release-report",
+    "category": "Generate report",
+    "difficulty": "junior",
+    "title": "Generate a release-ready report",
+    "prompt": "Inspect recent project state and produce a concise release-readiness report with risks, completed work, and recommended next actions."
+  },
+  {
+    "id": "task-14-agentic-multi-step-fix",
+    "category": "Agentic",
+    "difficulty": "junior",
+    "title": "Complete a multi-step agentic task",
+    "prompt": "Plan and execute a small multi-step improvement that requires reading code, making a focused change, and verifying the result. Use todo tracking and finish with a final report."
+  },
+  {
+    "id": "task-15-project-from-prompt-cli-tool",
+    "category": "Create project from prompt",
+    "difficulty": "junior",
+    "title": "Create a tiny utility from a prompt",
+    "prompt": "Create a tiny project or utility from scratch based on this prompt: a CLI helper that prints a friendly summary of the current repo or working directory."
+  },
+  {
+    "id": "task-16-run-tests-targeted",
+    "category": "Run tests",
+    "difficulty": "junior",
+    "title": "Run targeted tests",
+    "prompt": "Identify the most relevant existing tests for a recent or likely change area, run them, and summarize whether the project is green or what is failing."
+  },
+  {
+    "id": "task-17-fix-test-failures",
+    "category": "Fix failures",
+    "difficulty": "junior",
+    "title": "Fix one failing test path",
+    "prompt": "Find one failing or fragile test path, stabilize it or fix the underlying code, and verify the relevant test command passes."
+  },
+  {
+    "id": "task-18-commit-ready-changes",
+    "category": "Commit changes",
+    "difficulty": "junior",
+    "title": "Prepare a commit-ready change",
+    "prompt": "Make one small but useful improvement, verify it, and prepare the change so it is ready for a clean git commit with a professional message."
+  },
+  {
+    "id": "task-19-coding-empty-state",
+    "category": "Coding",
+    "difficulty": "junior",
+    "title": "Add an empty state UI",
+    "prompt": "Implement a polished empty state for an existing screen or list so the UI feels complete when there is no data."
+  },
+  {
+    "id": "task-20-fix-typo-or-copy-bug",
+    "category": "Fix bug",
+    "difficulty": "junior",
+    "title": "Fix a visible UX bug",
+    "prompt": "Find a small but visible UX bug such as broken text, a dead link, or inconsistent copy, then fix it cleanly and verify the affected area."
+  },
+  {
+    "id": "task-21-add-feature-doc-nav",
+    "category": "Add feature",
+    "difficulty": "junior",
+    "title": "Add docs navigation enhancement",
+    "prompt": "Add a small documentation-navigation feature such as a quick links section, section anchors, or a CTA that improves discoverability."
+  },
+  {
+    "id": "task-22-write-api-session-summary",
+    "category": "Write API",
+    "difficulty": "junior",
+    "title": "Add a session summary endpoint",
+    "prompt": "Write a simple API that returns a short session or usage summary object and keep the response shape easy for a frontend to consume."
+  },
+  {
+    "id": "task-23-refactor-ui-component",
+    "category": "Refactor code",
+    "difficulty": "junior",
+    "title": "Refactor a reusable UI component",
+    "prompt": "Refactor one reusable UI component to improve naming, props clarity, or styling consistency without changing the public behavior."
+  },
+  {
+    "id": "task-24-terminal-dependency-audit",
+    "category": "Terminal",
+    "difficulty": "junior",
+    "title": "Audit dependencies from terminal",
+    "prompt": "Use terminal commands to inspect package manifests and identify one outdated, duplicate, or suspicious dependency pattern, then summarize what should happen next."
+  },
+  {
+    "id": "task-25-git-history-summary",
+    "category": "Git operations",
+    "difficulty": "junior",
+    "title": "Summarize recent git history",
+    "prompt": "Review recent git history and summarize what changed recently, the likely release theme, and any hotspots a new engineer should inspect first."
+  },
+  {
+    "id": "task-26-docker-compose-local",
+    "category": "Docker",
+    "difficulty": "junior",
+    "title": "Add local docker compose support",
+    "prompt": "Add a simple docker compose setup for local development or document what is missing to support one cleanly in this repo."
+  },
+  {
+    "id": "task-27-linux-file-permissions-note",
+    "category": "Linux commands",
+    "difficulty": "junior",
+    "title": "Check Linux deployment readiness",
+    "prompt": "Review the repo for likely Linux deployment gotchas such as scripts, paths, or permissions assumptions, and produce a concise readiness note."
+  },
+  {
+    "id": "task-28-install-test-helper",
+    "category": "Package installation",
+    "difficulty": "junior",
+    "title": "Install a test helper package",
+    "prompt": "Add a minimal testing helper package or utility that would improve reliability for the existing test setup, then document how it helps."
+  },
+  {
+    "id": "task-29-research-auth-flow",
+    "category": "Research",
+    "difficulty": "junior",
+    "title": "Research CLI to web auth handoff",
+    "prompt": "Research and summarize the best approach for passing a CLI login flow into a hosted web app callback securely, with concrete notes about PKCE, state, and redirect validation."
+  },
+  {
+    "id": "task-30-agentic-full-mini-project",
+    "category": "Agentic",
+    "difficulty": "junior",
+    "title": "Ship a mini end-to-end improvement",
+    "prompt": "Take a small end-to-end improvement from prompt to completion: plan the work, inspect relevant files, implement the change, run a focused verification step, and finish with a concise final report."
+  }
+]

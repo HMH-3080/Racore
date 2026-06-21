@@ -8,6 +8,7 @@ export const AUTH_FILE = join(APP_DIR, "auth.json");
 export const CONFIG_FILE = join(APP_DIR, "config.json");
 export const MODELS_FILE = join(APP_DIR, "models.json");
 export const THEME_PREFERENCES_PATH = join(APP_DIR, "preferences.json");
+export const USAGE_FILE = join(APP_DIR, "usage.json");
 
 export function ensureAppDirectories() {
   mkdirSync(APP_DIR, { recursive: true, mode: 0o700 });

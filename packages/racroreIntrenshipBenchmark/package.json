@@ -1,0 +1,12 @@
+{
+  "name": "@racore/internship-benchmark",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Daily junior SWE benchmark tasks for R'a Core headless mode",
+  "type": "module",
+  "scripts": {
+    "benchmark": "node scripts/run-benchmark.mjs",
+    "benchmark:report": "node scripts/run-benchmark.mjs --report-only",
+    "benchmark:help": "node scripts/run-benchmark.mjs --help"
+  }
+}

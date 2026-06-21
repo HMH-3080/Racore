@@ -1,0 +1,63 @@
+name: R'a Core Internship Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: Number of tasks to run
+        required: false
+        default: "30"
+      model:
+        description: Model name for headless racore runs
+        required: false
+        default: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+      mode:
+        description: racore mode
+        required: false
+        default: "build"
+  schedule:
+    - cron: "0 6 * * *"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      RACORE_PROVIDER: openrouter
+      RACORE_MODEL: ${{ github.event.inputs.model || 'openai/gpt-5' }}
+      RACORE_MODE: ${{ github.event.inputs.mode || 'build' }}
+      BENCHMARK_TARGET_CWD: ${{ github.workspace }}
+      RACORE_PRICE_INPUT_PER_1M: "1.25"
+      RACORE_PRICE_OUTPUT_PER_1M: "10"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build CLI
+        run: npm run build:cli
+
+      - name: Run internship benchmark
+        working-directory: packages/racrore intrenship benchmark
+        run: node scripts/run-benchmark.mjs --limit "${{ github.event.inputs.limit || '30' }}"
+
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: racore-internship-benchmark
+          path: |
+            packages/racrore intrenship benchmark/reports/latest.md
+            packages/racrore intrenship benchmark/reports/summary.json
+            packages/racrore intrenship benchmark/reports/results
