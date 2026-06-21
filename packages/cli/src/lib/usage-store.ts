@@ -1,3 +1,6 @@
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { ensureAppDirectories, USAGE_FILE } from "./app-paths";
+
 type UsageSnapshot = {
   totalTokens: number;
   inputTokens: number;
@@ -22,13 +25,35 @@ type UsageEntry = {
   toolCalls: number;
 };
 
-let entries: UsageEntry[] = [];
+let entries: UsageEntry[] | null = null;
 let listeners: Array<() => void> = [];
 
-function notify() {
-  for (const listener of listeners) {
-    listener();
+function loadEntries(): UsageEntry[] {
+  try {
+    if (!existsSync(USAGE_FILE)) return [];
+    const raw = JSON.parse(readFileSync(USAGE_FILE, "utf8")) as Array<UsageEntry & { timestamp: string }>;
+    return raw.map((e) => ({ ...e, timestamp: new Date(e.timestamp) }));
+  } catch {
+    return [];
   }
+}
+
+function getEntries(): UsageEntry[] {
+  if (entries === null) entries = loadEntries();
+  return entries;
+}
+
+function persist() {
+  try {
+    ensureAppDirectories();
+    writeFileSync(USAGE_FILE, JSON.stringify(getEntries(), null, 2), "utf8");
+  } catch {
+    // non-fatal
+  }
+}
+
+function notify() {
+  for (const listener of listeners) listener();
 }
 
 export function subscribe(listener: () => void) {
@@ -39,34 +64,37 @@ export function subscribe(listener: () => void) {
 }
 
 export function recordUsage(entry: Omit<UsageEntry, "timestamp">) {
-  entries.push({ ...entry, timestamp: new Date() });
+  getEntries().push({ ...entry, timestamp: new Date() });
+  persist();
   notify();
 }
 
 export function getUsageHistory(): UsageEntry[] {
-  return [...entries];
+  return [...getEntries()];
 }
 
 export function getUsageSnapshot(): UsageSnapshot {
-  const totalTokens = entries.reduce((sum, e) => sum + e.totalTokens, 0);
-  const inputTokens = entries.reduce((sum, e) => sum + e.inputTokens, 0);
-  const outputTokens = entries.reduce((sum, e) => sum + e.outputTokens, 0);
-  const totalCost = entries.reduce((sum, e) => sum + e.cost, 0);
+  const all = getEntries();
+  const totalTokens = all.reduce((sum, e) => sum + e.totalTokens, 0);
+  const inputTokens = all.reduce((sum, e) => sum + e.inputTokens, 0);
+  const outputTokens = all.reduce((sum, e) => sum + e.outputTokens, 0);
+  const totalCost = all.reduce((sum, e) => sum + e.cost, 0);
 
   return {
     totalTokens,
     inputTokens,
     outputTokens,
     totalCost,
-    sessionCount: entries.length,
-    totalMessages: entries.length,
-    totalToolCalls: entries.reduce((sum, e) => sum + e.toolCalls, 0),
-    totalDurationMs: entries.reduce((sum, e) => sum + e.durationMs, 0),
-    lastUpdated: entries.length > 0 ? entries[entries.length - 1].timestamp : new Date(),
+    sessionCount: all.length,
+    totalMessages: all.length,
+    totalToolCalls: all.reduce((sum, e) => sum + e.toolCalls, 0),
+    totalDurationMs: all.reduce((sum, e) => sum + e.durationMs, 0),
+    lastUpdated: all.length > 0 ? all[all.length - 1]!.timestamp : new Date(),
   };
 }
 
 export function clearUsage() {
   entries = [];
+  persist();
   notify();
 }

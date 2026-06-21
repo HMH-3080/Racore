@@ -5,3 +5,5 @@ export { ModelsDialogContent } from "./models-dialog";
 export { ProviderDialogContent } from "./provider-dialog";
 export { ApiKeyDialogContent } from "./api-key-dialog";
 export { FontSizeDialogContent } from "./font-size-dialog";
+export { McpDialogContent } from "./mcp-dialog";
+export { SkillsDialogContent } from "./skills-dialog";

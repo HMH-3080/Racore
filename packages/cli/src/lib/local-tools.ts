@@ -18,7 +18,7 @@ import { runPostWriteHook } from "./custom-commands";
 import { gitCommit, gitDiff, gitLog, gitStatus } from "./git-tools";
 import { createGitignoreFilter } from "./gitignore";
 import { checkBashPermission, checkWritePermission } from "./permissions";
-import { getShellArgv } from "./shell";
+import { getShellArgv, getCmdArgv, getPowerShellArgv } from "./shell";
 import { verifyChanges } from "./verify";
 import { webFetch } from "./web-tools";
 
@@ -72,30 +72,33 @@ function truncate(value: string, limit: number) {
 
 export async function executeLocalTool(toolName: string, input: unknown, mode: ModeType): Promise<unknown> {
   if (
-    mode === Mode.PLAN
-    && ![
-      "readFile",
-      "listDirectory",
-      "glob",
-      "grep",
-      "readManyFiles",
-      "grepManyPatterns",
-      "agentPlan",
-      "repoIndex",
-      "searchSymbols",
-      "affectedTests",
-      "readProjectMemory",
-      "gitStatus",
-      "gitDiff",
-      "gitLog",
-      "webFetch",
-      "listCheckpoints",
-      "listSkills",
-      "useSkill",
-    ].includes(toolName)
-  ) {
-    throw new Error(`Tool ${toolName} is not available in PLAN mode`);
-  }
+      mode === Mode.PLAN
+      && ![
+        "readFile",
+        "listDirectory",
+        "glob",
+        "grep",
+        "readManyFiles",
+        "grepManyPatterns",
+        "agentPlan",
+        "repoIndex",
+        "searchSymbols",
+        "affectedTests",
+        "readProjectMemory",
+        "gitStatus",
+        "gitDiff",
+        "gitLog",
+        "webFetch",
+        "duckduckgo_search",
+        "listCheckpoints",
+        "listSkills",
+        "useSkill",
+        "updateTodoList",
+        "getTodoList",
+      ].includes(toolName)
+    ) {
+      throw new Error(`Tool ${toolName} is not available in PLAN mode`);
+    }
 
   // Surface live progress in the status line while tools execute.
   reportAgentActivity("tool", toolName);
@@ -418,6 +421,67 @@ export async function executeLocalTool(toolName: string, input: unknown, mode: M
         stderr: truncate(stderr, MAX_OUTPUT),
         exitCode,
       };
+    }
+    case "cmd": {
+      const { command, timeout = DEFAULT_TIMEOUT } = toolInputSchemas.cmd.parse(input);
+      const decision = await checkBashPermission(command);
+      if (!decision.allowed) {
+        return { stdout: "", stderr: decision.reason, exitCode: 126, blocked: true as const };
+      }
+      const proc = Bun.spawn(getCmdArgv(command), {
+        cwd: resolveInsideCwd(".").resolved,
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, TERM: "dumb" },
+      });
+      const timer = setTimeout(() => proc.kill(), timeout);
+      const [stdout, stderr] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+      ]);
+      const exitCode = await proc.exited;
+      clearTimeout(timer);
+      return {
+        stdout: truncate(stdout, MAX_OUTPUT),
+        stderr: truncate(stderr, MAX_OUTPUT),
+        exitCode,
+      };
+    }
+    case "powershell": {
+      const { command, timeout = DEFAULT_TIMEOUT } = toolInputSchemas.powershell.parse(input);
+      const decision = await checkBashPermission(command);
+      if (!decision.allowed) {
+        return { stdout: "", stderr: decision.reason, exitCode: 126, blocked: true as const };
+      }
+      const proc = Bun.spawn(getPowerShellArgv(command), {
+        cwd: resolveInsideCwd(".").resolved,
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, TERM: "dumb" },
+      });
+      const timer = setTimeout(() => proc.kill(), timeout);
+      const [stdout, stderr] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+      ]);
+      const exitCode = await proc.exited;
+      clearTimeout(timer);
+      return {
+        stdout: truncate(stdout, MAX_OUTPUT),
+        stderr: truncate(stderr, MAX_OUTPUT),
+        exitCode,
+      };
+    }
+    case "duckduckgo_search": {
+      const { query } = toolInputSchemas.duckduckgo_search.parse(input);
+      const url = `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        },
+      });
+      const html = await response.text();
+      return { results: truncate(html, MAX_OUTPUT) };
     }
     case "updateTodoList": {
       const { updates } = toolInputSchemas.updateTodoList.parse(input);

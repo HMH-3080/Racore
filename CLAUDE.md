@@ -4,217 +4,78 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This repository contains the source for **R'a Core CLI**, a standalone terminal-based AI coding assistant.  
-The project is structured as a **monorepo** with the main application implemented in:
+**R'a Core CLI** (`@loai/racore-cli`) is a terminal-based AI coding assistant built as a React application rendered in the terminal via OpenTUI. The repo is an npm workspace monorepo with three packages: `packages/cli` (main app), `packages/mcp-core`, and `packages/team-engine`. All active development is in `packages/cli`.
 
-```
-packages/cli/
-```
+Tech stack: Bun runtime, React 19, TypeScript ES modules, `@opentui/react` for TUI rendering, `ai` SDK + `@ai-sdk/openai` / `@openrouter/ai-sdk-provider` for model calls, React Router v7 for screen navigation.
 
-The CLI is built using:
+Runtime data is stored in `~/.racore/` (auth, config, preferences, sessions).
 
-- **Bun** (via a wrapper script `scripts/run-bun.mjs`)
-- **React** (rendered via the OpenTUI framework)
-- **TypeScript ES modules**
-- **ai-sdk** and **OpenAI client** for model interactions
-- **React Router** for screen navigation inside the TUI
+## Development Commands
 
-The application compiles to a distributable CLI binary exposed as:
+All commands run from the **repo root** unless noted.
 
-```
-racore
-```
+```bash
+# Install dependencies (first-time setup)
+bun install
 
-## Key Development Commands
+# Dev mode (watches packages/cli/src/index.tsx)
+bun run dev:cli
 
-All commands are run from:
+# Build CLI to packages/cli/dist/
+bun run build:cli
 
-```
-packages/cli/
-```
+# Run all CLI tests
+bun run test:cli
 
-### Development Mode (with file watching)
-
-```
-npm run dev
-```
-
-This uses Bun to run `src/index.tsx` in watch mode.
-
-### Build
-
-```
-npm run build
-```
-
-Produces the CLI output in `packages/cli/dist/` for publishing.
-
-### Run Tests
-
-```
-npm test
-```
-
-All tests are located at:
-
-```
-src/lib/*.test.ts
-```
-
-### Run a Single Test
-
-```
+# Run a single test file (from packages/cli/)
 node ../../scripts/run-bun.mjs test src/lib/<test-file>.test.ts
+
+# Link CLI binary locally for manual testing
+npm run link:cli
+
+# Bump version (patch/minor/major) — updates packages/cli/package.json only
+npm run version:patch
 ```
 
-Replace `<test-file>` with the name of a test to run only that file.
+`scripts/run-bun.mjs` is a thin wrapper that ensures Bun commands run consistently across environments.
 
-## High-Level Architecture
+## Publishing
 
-### 1. Entry Point
-
-```
-packages/cli/src/index.tsx
+```bash
+npm publish --workspace @loai/racore-cli --access public
 ```
 
-This bootstraps:
+`prepublishOnly` runs the build automatically. Update `CHANGELOG.md` before publishing.
 
-- Providers (theme, dialogs, keyboard layer, toast, prompt config)
-- The root layout
-- The router for screen navigation
+## Architecture
 
-The CLI is effectively a **React application rendered in the terminal via OpenTUI**.
+### Entry point & routing
 
-### 2. Screens (Application States)
+`packages/cli/src/index.tsx` bootstraps all React context providers and mounts the React Router router. Screens in `src/screens/` are the top-level route components — this is where to start when changing a user flow.
 
-Screens represent high-level flows:
+### Core logic (`src/lib/`)
 
-```
-src/screens/
-  home.tsx
-  config.tsx
-  provider.tsx
-  provider-screen.tsx
-  new-session.tsx
-  session.tsx
-  onboarding.tsx
-  releases.tsx
-```
+This directory holds all non-UI behavior:
 
-Each screen manages its own data loading and UI interactions.  
-This is the primary place to make changes when altering user flows.
+- **chat-service.ts** — Assembles the four-protocol system prompt (Speed / Task Plan / Completion / Skills) and orchestrates streaming model requests. Auto-injects relevant skills based on task context.
+- **agent-accelerator.ts** — Pre-turn intent classifier: categorizes tasks (bug/feature/refactor/docs/config/test/UI), scores risk, selects candidate files from the repo index, and builds an acceleration strategy passed into the prompt.
+- **local-tools.ts** — All 21+ built-in tools: file ops, git, task management, skills CRUD, verification, web fetch.
+- **tool-registry.ts** — Assembles the active toolset per turn from `CORE_TOOLS + PLANNING_TOOLS + HEAVY_TOOLS` plus any MCP tools.
+- **skills.ts** — Reusable expertise packs stored as markdown files. `findRelevantSkills()` handles auto-injection; `createSkill()` lets the agent persist new expertise.
+- **todo-store.ts** — Reactive task list. `getPendingTodos()` / `getInProgressTodos()` drive the Task Plan protocol.
+- **checkpoint-store.ts** — Snapshots files before edits; supports restore.
+- **config-store.ts** — Persistent provider/key/settings config.
+- **models.ts** — Model definitions, provider metadata, validation.
+- **mcp.ts** — MCP server integration.
 
-### 3. UI Components
+### Auto-continue engine (`src/hooks/use-chat.ts`)
 
-Components live in:
+After each assistant turn, `hasPendingTasks()` inspects `getTodoList`/`updateTodoList` tool outputs. If tasks remain, it auto-submits a continuation prompt — up to 12 rounds. Escape key sets `abortRef` to interrupt. A "Final Report" heading in the response signals completion.
 
-```
-src/components/
-```
+### UI layer
 
-Important groups:
-
-- **dialogs/**: Modal UI for configuration, provider selection, model selection, API keys, font size, theme, sessions, agents.
-- **messages/**: User and bot message components for session rendering.
-- **command-menu/**: UI and command definitions for palette-like features.
-- **app-shell.tsx**: Global layout wrapper including header, status bar, and child routing.
-- **input-bar.tsx**: The primary user input interaction component.
-- **session-shell.tsx**: Handles rendering and streaming AI responses inside a session.
-
-These components are built atop OpenTUI primitives.
-
-### 4. Providers (App-wide State)
-
-Under:
-
-```
-src/providers/
-```
-
-Key providers include:
-
-- **theme/** — manages color theme and font sizing.
-- **dialog/** — global modal stack.
-- **keyboard-layer/** — keybinding layers (intercepts key events).
-- **toast/** — notifications.
-- **prompt-config/** — model + provider configuration used by session chat logic.
-
-These act as React context providers and unify behavior across screens.
-
-### 5. Core Logic (Chat, Config, Services)
-
-Most non-UI logic lives in:
-
-```
-src/lib/
-```
-
-Notable files:
-
-- **chat-service.ts** — Orchestrates model requests, streaming responses, and builds the system prompt from four protocols (speed, task plan, completion, skills). Auto-injects relevant skills into the prompt based on task context.
-- **agent-accelerator.ts** — Intent controller: classifies tasks (bug/feature/refactor/docs/config/test/UI), assesses risk, selects candidate files from the repo index, suggests verification commands, and builds acceleration strategies.
-- **local-tools.ts** — Implements all 21+ built-in tools including file ops, git, skills, task management, verification, and web fetch.
-- **tool-registry.ts** — Mode-aware tool registry that assembles the toolset per turn (CORE_TOOLS + PLANNING_TOOLS + HEAVY_TOOLS + MCP tools).
-- **skills.ts** — Skills system: stores/retrieves reusable expertise packs as markdown files. Includes `findRelevantSkills()` for auto-injection and `createSkill()` for the skill creator.
-- **todo-store.ts** — Task list with reactive listeners. Powers the task plan protocol with `getPendingTodos()`, `getInProgressTodos()`, and `getTodoStats()`.
-- **config-store.ts** — Reads/writes persistent CLI config (providers, keys, settings).
-- **models.ts** — Defines available model configurations, providers, metadata, and validation.
-- **mcp.ts** — MCP server integration for external tool providers.
-- **checkpoint-store.ts** — Automatic file snapshots before edits with restore capability.
-- **tests** for corresponding modules.
-
-This directory contains the bulk of the system's behavior that integrates the API, session logic, task management, skills, and persisted user environment.
-
-### 6. Auto-Continue Engine (Hooks)
-
-```
-src/hooks/use-chat.ts
-```
-
-The auto-continue engine is the core mechanism that ensures the system **never stops until all tasks are done**:
-
-- **`hasPendingTasks()`** — Detects if the latest assistant response has unfinished tasks by checking `getTodoList`/`updateTodoList` tool outputs for pending/in_progress items
-- **Auto-continue loop** — After each assistant response, if tasks remain pending, automatically submits a continuation prompt (up to 12 rounds max)
-- **`abortRef`** — Allows user interruption via Escape key
-- **Completion detection** — Recognizes Final Report headings as completion signals
-
-### 7. System Prompt Architecture
-
-The system prompt is built from four protocols:
-
-1. **Speed Protocol** — Fast workspace context, parallel batch tools, focused verification
-2. **Task Plan Protocol** — AI-generated task decomposition, never duplicate existing tasks, batch parallel work
-3. **Completion Protocol** — Never stop until all tasks done, write Final Report
-4. **Skills Protocol** — Apply injected skills, use MCP tools for their domains, save new skills
-
-### 8. Build & Publish Infrastructure
-
-The CLI uses:
-
-```
-scripts/run-bun.mjs
-```
-
-This wrapper ensures Bun commands run consistently across environments.
-
-Publishing happens with:
-
-```
-npm publish
-```
-
-(after running the build script automatically via `prepublishOnly`)
-
-### 9. Binary Entry Point
-
-The published CLI exposes:
-
-```
-bin/racore
-```
-
-which executes the compiled script under `dist/`.
-
-## Cursor / Copilot / Other Rules
-
-There are **no .cursor rules, no .cursorrules, and no GitHub Copilot instruction files** in this repository at the time of generation, so nothing additional is required here.
+- `src/components/app-shell.tsx` — Global layout (header, status bar, child routing).
+- `src/components/session-shell.tsx` — Renders and streams AI responses.
+- `src/components/input-bar.tsx` — Primary user input.
+- `src/components/dialogs/` — Modal stack for config, provider/model selection, API keys, theme, sessions.
+- `src/providers/` — React contexts for theme, dialog stack, keyboard layer, toasts, and prompt config.

@@ -121,6 +121,19 @@ export const toolInputSchemas = {
     description: z.string().optional().describe("Short description of the command"),
     timeout: z.number().optional().describe("Timeout in milliseconds"),
   }),
+  cmd: z.object({
+    command: z.string().describe("Windows Command Prompt command to run"),
+    description: z.string().optional().describe("Short description of the command"),
+    timeout: z.number().optional().describe("Timeout in milliseconds"),
+  }),
+  powershell: z.object({
+    command: z.string().describe("PowerShell command to run"),
+    description: z.string().optional().describe("Short description of the command"),
+    timeout: z.number().optional().describe("Timeout in milliseconds"),
+  }),
+  duckduckgo_search: z.object({
+    query: z.string().describe("Search query for DuckDuckGo"),
+  }),
   invokeAI: z.object({
     task: z.string().describe("A focused subtask for a parallel AI pass"),
     context: z.string().optional().describe("Optional extra context for the subtask"),

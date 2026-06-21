@@ -32,6 +32,16 @@ export function getShellArgv(command: string): string[] {
   return ["bash", "-c", command];
 }
 
+/** Build argv for Windows Command Prompt (cmd.exe) */
+export function getCmdArgv(command: string): string[] {
+  return ["cmd.exe", "/c", command];
+}
+
+/** Build argv for PowerShell */
+export function getPowerShellArgv(command: string): string[] {
+  return ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command];
+}
+
 /** Human-readable name of the shell that will execute commands. */
 export function getShellName(): string {
   if (process.platform !== "win32") return "bash";
