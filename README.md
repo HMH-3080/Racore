@@ -424,8 +424,9 @@ npm version patch   # or minor / major
 # Build + publish
 npm publish --access public
 ```
-
+## Benchmark 
 ---
+<img width="1536" height="1024" alt="Gemini_Generated_Image_v7i8gmv7i8gmv7i8" src="https://github.com/user-attachments/assets/0c5c3c23-a7fd-4ac4-9166-961e6d9cd01e" />
 
 ## License
 
